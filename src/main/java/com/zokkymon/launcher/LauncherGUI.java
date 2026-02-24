@@ -910,7 +910,7 @@ public class LauncherGUI extends JFrame {
     }
 
     private JPanel buildBanner() {
-        JPanel banner = new JPanel() {
+        JPanel banner = new JPanel(null) {  // null layout pour le badge overlay
             @Override protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -918,55 +918,76 @@ public class LauncherGUI extends JFrame {
                 int w = getWidth(), h = getHeight();
                 if (bannerImg != null) {
                     double scale = (double) w / bannerImg.getWidth();
-                    g2.drawImage(bannerImg, 0, 0, w, (int)(bannerImg.getHeight() * scale), null);
-                    // Voile sombre neutre
-                    g2.setColor(new Color(0, 0, 0, 35));
+                    int imgH = (int)(bannerImg.getHeight() * scale);
+                    // Ancre l'image par le bas — les persos en bas sont toujours visibles
+                    int yOff = Math.min(0, h - imgH);
+                    g2.drawImage(bannerImg, 0, yOff, w, imgH, null);
+                    g2.setColor(new Color(0, 0, 0, 30));
                     g2.fillRect(0, 0, w, h);
                 } else {
                     g2.setPaint(new GradientPaint(0, 0, SIDEBAR1, 0, h, BG));
                     g2.fillRect(0, 0, w, h);
                 }
-                // Dégradé en bas → BG harmonisé
-                g2.setPaint(new GradientPaint(0, h-20, new Color(0,0,0,0), 0, h, BG));
-                g2.fillRect(0, h-20, w, 20);
-                // Lueur accent en bas à gauche (déco thème-cohérente)
+                // Dégradé en haut — masque le crop naturellement
+                g2.setPaint(new GradientPaint(0, 0, BG, 0, 55, new Color(BG.getRed(), BG.getGreen(), BG.getBlue(), 0)));
+                g2.fillRect(0, 0, w, 55);
+                // Dégradé en bas → BG
+                g2.setPaint(new GradientPaint(0, h - 30, new Color(0, 0, 0, 0), 0, h, BG));
+                g2.fillRect(0, h - 30, w, 30);
+                // Lueur accent en bas à gauche
                 g2.setPaint(new RadialGradientPaint(new Point(100, h), 200,
-                    new float[]{0f, 1f}, new Color[]{new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 35), new Color(0,0,0,0)}));
-                g2.fillRect(0, h-200, 260, 200);
-                // Signature "Fait par Zokkyen" — haut droite
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,      RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-                g2.setFont(FONT_SIG1); int w1 = g2.getFontMetrics().stringWidth("Fait par");
-                g2.setFont(FONT_SIG2); int w2 = g2.getFontMetrics().stringWidth("Zokkyen");
-                int bw = Math.max(w1, w2) + 22, bh = 44, bx = w - bw - 12, by = 10;
-                // Palette sombre du thème actif pour que le badge soit toujours lisible
-                Color[] dPal = themeManager.getCurrent().dark;
-                Color badgeBg      = dPal[ThemeDefinition.IDX_BG];
-                Color badgeTextDim = dPal[ThemeDefinition.IDX_TEXT_DIM];
-                Color badgeAccent  = dPal[ThemeDefinition.IDX_ACCENT];
-                // Fond — même couleur que le background sombre, opaque
-                g2.setColor(badgeBg);
-                g2.fillRoundRect(bx, by, bw, bh, 14, 14);
-                // Bordure fine accordée à l'accent
-                g2.setColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80));
-                g2.setStroke(new BasicStroke(1f));
-                g2.drawRoundRect(bx, by, bw, bh, 14, 14);
-                // "Fait par" — blanc doux centré
-                g2.setFont(FONT_SIG1);
-                g2.setColor(badgeTextDim);
-                g2.drawString("Fait par", bx + (bw - w1) / 2, by + 16);
-                // "Zokkyen" — accent sombre + ombre pour relief
-                g2.setFont(FONT_SIG2);
-                int tx = bx + (bw - w2) / 2, ty = by + 34;
-                g2.setColor(new Color(badgeAccent.getRed(), badgeAccent.getGreen(), badgeAccent.getBlue(), 80));
-                g2.drawString("Zokkyen", tx + 1, ty + 1);
-                g2.setColor(badgeAccent);
-                g2.drawString("Zokkyen", tx, ty);
+                    new float[]{0f, 1f}, new Color[]{new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 30), new Color(0, 0, 0, 0)}));
+                g2.fillRect(0, h - 200, 260, 200);
                 g2.dispose();
             }
         };
-        banner.setPreferredSize(new Dimension(0, 265));
+        banner.setPreferredSize(new Dimension(0, 330));
         banner.setBackground(BG);
+
+        // ── Badge « Zokkyen » cliquable → GitHub ────────────────────────────────
+        boolean[] badgeHov = {false};
+        JLabel zokkyenBadge = new JLabel("Zokkyen ↗") {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                Color[] dark = themeManager.getCurrent().dark;
+                Color bg2 = new Color(dark[ThemeDefinition.IDX_BG].getRed(),
+                                      dark[ThemeDefinition.IDX_BG].getGreen(),
+                                      dark[ThemeDefinition.IDX_BG].getBlue(), badgeHov[0] ? 230 : 190);
+                Color acc = dark[ThemeDefinition.IDX_ACCENT];
+                g2.setColor(bg2);
+                g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 12, 12);
+                g2.setColor(new Color(acc.getRed(), acc.getGreen(), acc.getBlue(), badgeHov[0] ? 200 : 100));
+                g2.setStroke(new BasicStroke(1f));
+                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 12, 12);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        Color badgeAccent = themeManager.getCurrent().dark[ThemeDefinition.IDX_ACCENT];
+        zokkyenBadge.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        zokkyenBadge.setForeground(badgeAccent);
+        zokkyenBadge.setBorder(new EmptyBorder(4, 10, 4, 10));
+        zokkyenBadge.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        zokkyenBadge.setOpaque(false);
+        zokkyenBadge.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) {
+                try { java.awt.Desktop.getDesktop().browse(
+                    new java.net.URI("https://github.com/Zokkyen/Launcher-Zokkymon/tree/main")); }
+                catch (Exception ignored) {}
+            }
+            public void mouseEntered(MouseEvent e) { badgeHov[0] = true;  zokkyenBadge.repaint(); }
+            public void mouseExited (MouseEvent e) { badgeHov[0] = false; zokkyenBadge.repaint(); }
+        });
+        zokkyenBadge.setSize(zokkyenBadge.getPreferredSize());
+        banner.addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override public void componentResized(java.awt.event.ComponentEvent e) {
+                Dimension ps = zokkyenBadge.getPreferredSize();
+                zokkyenBadge.setSize(ps);
+                zokkyenBadge.setLocation(banner.getWidth() - ps.width - 10, 10);
+            }
+        });
+        banner.add(zokkyenBadge);
         return banner;
     }
 
