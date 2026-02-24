@@ -1568,8 +1568,33 @@ public class LauncherGUI extends JFrame {
         wrapper.add(btnRow, BorderLayout.SOUTH);
 
         refreshDialog[0] = () -> {
+            // Fonds
             wrapper.setBackground(BG);
+            UIManager.put("OptionPane.background",        BG);
+            UIManager.put("Panel.background",             BG);
+            UIManager.put("OptionPane.messageForeground", TEXT);
+            // Labels
+            lblRam.setForeground(TEXT);
+            lblPath.setForeground(TEXT);
+            lblThemeSelect.setForeground(TEXT);
+            lblTheme.setForeground(TEXT);
+            switchLbl.setForeground(TEXT);
+            // Champ chemin
+            fPath.setForeground(TEXT);
+            fPath.setCaretColor(TEXT);
+            // Boutons
+            btnOk.setBackground(ACCENT);
+            btnOk.setForeground(BG);
+            btnCancel.setBackground(CARD_BG);
+            btnCancel.setForeground(TEXT);
+            browse.setBackground(CARD_BG);
+            browse.setForeground(TEXT);
+            // Combos
+            cRam.setForeground(TEXT);
+            cTheme.setForeground(TEXT);
+            // Repaint global
             panel.repaint();
+            wrapper.repaint();
             dialog.repaint();
         };
 
