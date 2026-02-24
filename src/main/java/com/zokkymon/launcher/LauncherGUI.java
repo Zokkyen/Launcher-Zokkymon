@@ -14,11 +14,11 @@ import java.io.InputStream;
 import java.lang.management.ManagementFactory;
 
 /**
- * Interface principale du launcher — design style Modrinth/Prism.
+ * Interface principale du launcher — Design moderne "Glassmorphism"
  *
- * Layout : sidebar 230px (gauche) | zone principale (droite)
- *   Sidebar  : logo + 4 info-cards + capsule version launcher
- *   Principal: bannière cover-fill + console + barre du bas (status + boutons)
+ * Layout : Full Background Cover
+ * Sidebar  : Flottante semi-transparente (gauche)
+ * Principal: Épuré, bouton Logs, énorme bouton Jouer avec effet Glow.
  */
 public class LauncherGUI extends JFrame {
 
@@ -26,7 +26,6 @@ public class LauncherGUI extends JFrame {
     private static final long serialVersionUID = 1L;
 
     // ── Gestionnaire de thèmes ────────────────────────────────────────────────
-    // Initialisé dans le constructeur avant tout appel à applyTheme().
     static ThemeManager themeManager;
 
     // ── Couleurs actives (mises à jour par applyTheme) ───────────────────────
@@ -78,20 +77,20 @@ public class LauncherGUI extends JFrame {
     private JLabel  authStatusLbl;
     private JButton authActionBtn;
 
-    // ── Cache des états réseau (évite les appels superflus au rebuild) ────────
+    // ── Cache des états réseau ────────────────────────────────────────────────
     private volatile Boolean cachedServerOnline   = null;
-    private volatile String  cachedLauncherStatus = null; // "ok", "update", ou null
+    private volatile String  cachedLauncherStatus = null;
     private volatile String  cachedLauncherNewVer = null;
-    private volatile String  cachedModpackStatus  = null; // "absent", "outdated", "uptodate", ou null
+    private volatile String  cachedModpackStatus  = null;
     private volatile String  cachedInfoModpack    = null;
     private volatile String  cachedInfoJava       = null;
     private volatile String  cachedInfoRam        = null;
     private volatile String  cachedInfoMods       = null;
 
-    // ── Polices statiques (évite des allocations à chaque repaint) ───────────
+    // ── Polices statiques ─────────────────────────────────────────────────────
     private static final Font FONT_MONO  = new Font("Consolas", Font.PLAIN,  12);
 
-    // ── Cache images (chargées une seule fois, réutilisées au rebuild) ────────
+    // ── Cache images ──────────────────────────────────────────────────────────
     private transient BufferedImage bannerImg;
     private transient BufferedImage logoImg;
 
@@ -112,16 +111,14 @@ public class LauncherGUI extends JFrame {
         } catch (Exception ignored) {}
 
         config  = new ConfigManager();
-        // Injecter le CLIENT_ID Azure depuis la config — jamais en dur dans le code source
         MicrosoftAuth.setClientId(config.getClientId());
         themeManager = new ThemeManager(new java.io.File(System.getProperty("user.home"), ".zokkymon"));
         themeManager.setActiveId(config.getActiveTheme());
         applyTheme(config.isDarkMode());
         updater = new Updater(this, config);
 
-        // Chargement unique des images (réutilisées à chaque rebuild de thème)
         loadBannerForCurrentTheme();
-        logoImg   = loadImage("/zokkymon.png", "/zokkymon.ico");
+        logoImg = loadImage("/zokkymon.png", "/zokkymon.ico");
 
         setTitle("Launcher Zokkymon");
         setSize(1100, 680);
@@ -131,12 +128,12 @@ public class LauncherGUI extends JFrame {
         setResizable(true);
         loadWindowIcon();
 
-        JPanel root = new JPanel(new BorderLayout());
-        root.setBackground(BG);
-        root.add(buildSidebar(),  BorderLayout.WEST);
-        root.add(buildMainArea(), BorderLayout.CENTER);
-        setContentPane(root);
+        // Initialisation des logs avant l'UI pour éviter les NullPointer
+        initLogs();
 
+        // On crée la racine qui peindra le fond complet "Cover"
+        JPanel root = buildRootPanel();
+        setContentPane(root);
         setVisible(true);
 
         startBackgroundChecks();
@@ -144,12 +141,26 @@ public class LauncherGUI extends JFrame {
     }
 
     /**
-     * Lance les tâches légères de vérification au démarrage et après un changement de thème.
-     * Restaure les états mis en cache immédiatement — les appels réseau ne sont faits qu'au premier lancement.
-     * NE relance PAS checkAndUpdate (mise à jour du jeu).
+     * Initialise la console de logs en arrière-plan. 
+     * Elle n'est plus affichée par défaut, mais est prête pour la fenêtre de logs.
      */
+    private void initLogs() {
+        logArea = new JTextArea();
+        logArea.setEditable(false);
+        logArea.setFont(FONT_MONO);
+        logArea.setBackground(new Color(20, 20, 25)); // Fond sombre neutre pour les logs
+        logArea.setForeground(new Color(220, 220, 220));
+        logArea.setLineWrap(true);
+        logArea.setWrapStyleWord(true);
+        logArea.setBorder(new EmptyBorder(8, 10, 8, 10));
+        ((javax.swing.text.DefaultCaret) logArea.getCaret()).setUpdatePolicy(javax.swing.text.DefaultCaret.NEVER_UPDATE);
+
+        logScrollPane = new JScrollPane(logArea);
+        logScrollPane.setBorder(BorderFactory.createLineBorder(new Color(255, 255, 255, 30), 1));
+        logScrollPane.getViewport().setBackground(new Color(20, 20, 25));
+    }
+
     private void startBackgroundChecks() {
-        // ── Info-cards (locales, très rapides — mais cache quand même) ──────
         if (cachedInfoModpack != null) {
             SwingUtilities.invokeLater(() -> {
                 infoModpackVal.setText(cachedInfoModpack);
@@ -161,7 +172,6 @@ public class LauncherGUI extends JFrame {
             new Thread(this::initInfoCards).start();
         }
 
-        // ── Bouton Play : restaure l'état sans refaire le check réseau ──────
         if (cachedModpackStatus != null) {
             final String s = cachedModpackStatus;
             SwingUtilities.invokeLater(() -> {
@@ -180,7 +190,7 @@ public class LauncherGUI extends JFrame {
                         playButton.setBackground(WARNING);
                         playButton.setEnabled(true);
                     }
-                    default -> { // "uptodate"
+                    default -> {
                         setProgress(100);
                         setStatus("Prêt à jouer");
                         playButton.setText("JOUER");
@@ -191,14 +201,11 @@ public class LauncherGUI extends JFrame {
             });
         }
 
-        // ── Serveur : affiche le dernier état connu immédiatement ───────────
-        // La vérification réseau réelle est déclenchée par checkAndUpdate() au démarrage.
         if (cachedServerOnline != null) {
             final boolean s = cachedServerOnline;
             SwingUtilities.invokeLater(() -> applyServerState(s));
         }
 
-        // ── Capsule version launcher ─────────────────────────────────────────
         if (cachedLauncherStatus != null) {
             SwingUtilities.invokeLater(() -> {
                 versionCapsuleContainer.removeAll();
@@ -234,24 +241,16 @@ public class LauncherGUI extends JFrame {
         }
     }
 
-    /**
-     * Applique le thème et reconstruit toute l'interface dans la même fenêtre — sans dispose().
-     */
     private void rebuildUI(boolean dark) {
-        // Préserver le contenu de la console
         String savedLog = logArea != null ? logArea.getText() : "";
-
         applyTheme(dark);
         loadBannerForCurrentTheme();
-        JPanel root = new JPanel(new BorderLayout());
-        root.setBackground(BG);
-        root.add(buildSidebar(),  BorderLayout.WEST);
-        root.add(buildMainArea(), BorderLayout.CENTER);
+        
+        JPanel root = buildRootPanel();
         setContentPane(root);
         revalidate();
         repaint();
 
-        // Restaurer le contenu de la console
         if (!savedLog.isEmpty()) {
             logArea.setText(savedLog);
             SwingUtilities.invokeLater(() -> {
@@ -259,13 +258,55 @@ public class LauncherGUI extends JFrame {
                 bar.setValue(bar.getMaximum());
             });
         }
-
         startBackgroundChecks();
     }
 
     // ═════════════════════════════════════════════════════════════════════════
     //  Construction de l'UI
     // ═════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Panneau racine dessinant l'image de fond sur l'intégralité de la fenêtre (Glassmorphism bg)
+     */
+    private JPanel buildRootPanel() {
+        JPanel root = new JPanel(new BorderLayout()) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,  RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                
+                int w = getWidth(), h = getHeight();
+                
+                if (bannerImg != null) {
+                    // Calcul cover pour remplir l'écran sans distorsion
+                    double scaleW = (double) w / bannerImg.getWidth();
+                    double scaleH = (double) h / bannerImg.getHeight();
+                    double scale  = Math.max(scaleW, scaleH);
+                    int imgW = (int)(bannerImg.getWidth()  * scale);
+                    int imgH = (int)(bannerImg.getHeight() * scale);
+                    int xOff = (w - imgW) / 2;
+                    int yOff = (h - imgH) / 2; 
+                    
+                    g2.drawImage(bannerImg, xOff, yOff, imgW, imgH, null);
+                } else {
+                    g2.setPaint(new GradientPaint(0, 0, SIDEBAR1, 0, h, BG));
+                    g2.fillRect(0, 0, w, h);
+                }
+                
+                // Overlay teinté BG — s'adapte au thème clair/sombre et reste léger
+                int overlayAlpha = (BG.getRed() + BG.getGreen() + BG.getBlue()) < 200 ? 110 : 55;
+                g2.setColor(new Color(BG.getRed(), BG.getGreen(), BG.getBlue(), overlayAlpha));
+                g2.fillRect(0, 0, w, h);
+                g2.dispose();
+            }
+        };
+        root.setOpaque(true);
+        root.add(buildSidebar(),  BorderLayout.WEST);
+        root.add(buildMainArea(), BorderLayout.CENTER);
+        return root;
+    }
 
     private void loadWindowIcon() {
         try {
@@ -279,7 +320,6 @@ public class LauncherGUI extends JFrame {
         } catch (Exception ignored) {}
     }
 
-    /** Charge la première image ressource trouvée parmi les chemins donnés. */
     private BufferedImage loadImage(String... paths) {
         for (String path : paths) {
             try (InputStream is = getClass().getResourceAsStream(path)) {
@@ -292,18 +332,13 @@ public class LauncherGUI extends JFrame {
         return null;
     }
 
-    /**
-     * Charge la bannière du thème actif dans {@code bannerImg}.
-     * Si le thème possède un banner.png externe il est utilisé en priorité,
-     * sinon la bannière intégrée (/banner.png) est utilisée.
-     */
     private void loadBannerForCurrentTheme() {
         ThemeDefinition t = themeManager.getCurrent();
         if (t.banner != null) {
             bannerImg = t.banner;
             return;
         }
-        bannerImg = loadImage("/banner.png", "/zokkymon.png");
+        bannerImg = loadImage("/banniere.png", "/banniere.jpg", "/zokkymon.png");
     }
 
     // ── Sidebar ──────────────────────────────────────────────────────────────
@@ -311,32 +346,32 @@ public class LauncherGUI extends JFrame {
         JPanel s = new JPanel() {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setPaint(new GradientPaint(0, 0, SIDEBAR1, 0, getHeight(), SIDEBAR2));
+                // Fond Glassmorphism : Opaque sombre semi-transparent au lieu du dégradé plein
+                g2.setColor(new Color(10, 10, 15, 120));
                 g2.fillRect(0, 0, getWidth(), getHeight());
-                // Ligne séparatrice droite
-                Color sep = ACCENT;
-                g2.setPaint(new GradientPaint(getWidth()-1, 0, new Color(sep.getRed(), sep.getGreen(), sep.getBlue(), 130), getWidth()-1, getHeight(), new Color(sep.getRed(), sep.getGreen(), sep.getBlue(), 50)));
+                
+                // Ligne séparatrice subtile
+                Color sep = new Color(255, 255, 255, 20);
+                g2.setColor(sep);
                 g2.fillRect(getWidth()-1, 0, 1, getHeight());
                 g2.dispose();
             }
         };
         s.setLayout(new BoxLayout(s, BoxLayout.Y_AXIS));
-        s.setOpaque(true);
-        s.setPreferredSize(new Dimension(230, 0));
+        s.setOpaque(false);
+        s.setPreferredSize(new Dimension(240, 0));
         s.setBorder(new EmptyBorder(20, 16, 16, 16));
 
         s.add(buildLogoBlock());
-        s.add(vSep(12));
+        s.add(vSep(24));
         s.add(buildServerStatusPanel());
         s.add(vSep(8));
         s.add(buildAuthCard());
-        s.add(vSep(16));
-        s.add(hLine());
-        s.add(vSep(16));
+        s.add(vSep(24));
 
         JLabel sec = new JLabel("INFORMATIONS");
         sec.setFont(new Font("Segoe UI", Font.BOLD, 9));
-        sec.setForeground(TEXT_DIM);
+        sec.setForeground(new Color(255, 255, 255, 120));
         sec.setAlignmentX(LEFT_ALIGNMENT);
         s.add(sec);
         s.add(vSep(10));
@@ -360,7 +395,7 @@ public class LauncherGUI extends JFrame {
     }
 
     private JPanel buildLogoBlock() {
-        JPanel block = new JPanel(new BorderLayout(10, 0));
+        JPanel block = new JPanel(new BorderLayout(12, 0));
         block.setOpaque(false);
         block.setMaximumSize(new Dimension(Integer.MAX_VALUE, 64));
         block.setAlignmentX(LEFT_ALIGNMENT);
@@ -371,23 +406,25 @@ public class LauncherGUI extends JFrame {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                int arc = getWidth(); // cercle complet — mettre 12 pour juste arrondi
+                int arc = 20; // Arrondi doux
                 g2.setClip(new java.awt.geom.RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), arc, arc));
                 g2.drawImage(logoImg, 0, 0, getWidth(), getHeight(), null);
                 g2.dispose();
             }
         };
-        logo.setPreferredSize(new Dimension(48, 48));
+        logo.setPreferredSize(new Dimension(54, 54));
         logo.setOpaque(false);
 
         JPanel txt = new JPanel(new GridLayout(2, 1, 0, 2));
         txt.setOpaque(false);
         JLabel name = new JLabel(config.getModpackName());
-        name.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        name.setForeground(ACCENT);
+        name.setFont(new Font("Segoe UI", Font.BOLD, 15));
+        name.setForeground(Color.WHITE);
+        
         JLabel sub = new JLabel("Minecraft " + config.getMinecraftVersion());
-        sub.setFont(new Font("Segoe UI", Font.ITALIC, 11));
-        sub.setForeground(TEXT_DIM);
+        sub.setFont(new Font("Segoe UI", Font.ITALIC, 12));
+        sub.setForeground(new Color(255, 255, 255, 160));
+        
         txt.add(name);
         txt.add(sub);
 
@@ -396,61 +433,63 @@ public class LauncherGUI extends JFrame {
         return block;
     }
 
+    // Helper pour dessiner les cartes style Verre/Glassmorphism
+    private void paintGlassCard(Graphics g, int width, int height) {
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        
+        // Fond sombre translucide
+        g2.setColor(new Color(30, 30, 35, 160));
+        g2.fillRoundRect(0, 0, width-1, height-1, 16, 16);
+        
+        // Liseré brillant en haut pour l'effet de reflet sur le verre
+        g2.setPaint(new GradientPaint(0, 0, new Color(255, 255, 255, 30), 0, height, new Color(255, 255, 255, 5)));
+        g2.drawRoundRect(0, 0, width-1, height-1, 16, 16);
+        g2.dispose();
+    }
+
     // ── Voyant serveur ───────────────────────────────────────────────────────
     private JPanel buildServerStatusPanel() {
         JPanel card = new JPanel(new BorderLayout(10, 0)) {
             @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setPaint(new GradientPaint(0, 0, CARD_BG.brighter(), 0, getHeight(), CARD_BG));
-                g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 12, 12);
-                g2.setColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80));
-                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 12, 12);
-                g2.dispose();
+                paintGlassCard(g, getWidth(), getHeight());
                 super.paintComponent(g);
             }
         };
         card.setOpaque(false);
-        card.setBorder(new EmptyBorder(8, 10, 8, 10));
-        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 52));
+        card.setBorder(new EmptyBorder(8, 12, 8, 12));
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 54));
         card.setAlignmentX(LEFT_ALIGNMENT);
 
-        // Colonne gauche : gros point lumineux
         serverDot = new JLabel("\u25cf");
         serverDot.setFont(new Font("Segoe UI Symbol", Font.PLAIN, 22));
-        serverDot.setForeground(TEXT_DIM);
+        serverDot.setForeground(new Color(255, 255, 255, 100));
         serverDot.setHorizontalAlignment(SwingConstants.CENTER);
         serverDot.setPreferredSize(new Dimension(28, 28));
 
-        // Colonne droite : libellé haut + statut bas
         JPanel txt = new JPanel(new GridLayout(2, 1, 0, 1));
         txt.setOpaque(false);
         JLabel topLbl = new JLabel("SERVEUR");
         topLbl.setFont(new Font("Segoe UI", Font.BOLD, 9));
-        topLbl.setForeground(TEXT_DIM);
+        topLbl.setForeground(new Color(255, 255, 255, 120));
         serverStatusLbl = new JLabel("Vérification...");
-        serverStatusLbl.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        serverStatusLbl.setForeground(TEXT_DIM);
+        serverStatusLbl.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        serverStatusLbl.setForeground(Color.WHITE);
         txt.add(topLbl);
         txt.add(serverStatusLbl);
 
-        // Bouton refresh manuel ⟳
         serverRefreshBtn = new JButton() {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-                // Fond cercle
-                g2.setColor(getModel().isPressed() ? ACCENT : CONSOLE_BG);
+                g2.setColor(getModel().isPressed() ? ACCENT : new Color(50, 50, 60, 180));
                 g2.fillOval(0, 0, getWidth()-1, getHeight()-1);
-                // Bordure
-                g2.setColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 120));
-                g2.drawOval(0, 0, getWidth()-1, getHeight()-1);
-                // Icône centrée précisément via TextLayout (limites visuelles réelles)
+                
                 String icon = "\u27F3";
-                java.awt.Font font = new Font("Segoe UI Symbol", Font.PLAIN, 20);
+                java.awt.Font font = new Font("Segoe UI Symbol", Font.PLAIN, 18);
                 g2.setFont(font);
-                g2.setColor(getModel().isPressed() ? CONSOLE_BG : ACCENT);
+                g2.setColor(getModel().isPressed() ? Color.WHITE : new Color(220, 220, 220));
                 java.awt.font.TextLayout tl = new java.awt.font.TextLayout(icon, font, g2.getFontRenderContext());
                 java.awt.geom.Rectangle2D vb = tl.getBounds();
                 int x = (int) Math.round((getWidth()  - vb.getWidth())  / 2.0 - vb.getX());
@@ -460,19 +499,16 @@ public class LauncherGUI extends JFrame {
             }
         };
         serverRefreshBtn.setPreferredSize(new Dimension(32, 32));
-        serverRefreshBtn.setToolTipText("V\u00e9rifier maintenant");
+        serverRefreshBtn.setToolTipText("Vérifier maintenant");
         serverRefreshBtn.setFocusPainted(false);
         serverRefreshBtn.setContentAreaFilled(false);
         serverRefreshBtn.setBorderPainted(false);
         serverRefreshBtn.setOpaque(false);
-        // Désactive le rendu shadow/focus de FlatLaf qui s'affiche par-dessus
-        serverRefreshBtn.putClientProperty("JButton.buttonType", "borderless");
-        serverRefreshBtn.putClientProperty("FlatLaf.focusWidth", 0);
         serverRefreshBtn.addActionListener(e -> {
-            serverStatusLbl.setText("V\u00e9rification...");
-            serverStatusLbl.setForeground(TEXT_DIM);
-            serverDot.setForeground(TEXT_DIM);
-            cachedServerOnline = null; // invalide le cache pour forcer un vrai check
+            serverStatusLbl.setText("Vérification...");
+            serverStatusLbl.setForeground(new Color(255, 255, 255, 120));
+            serverDot.setForeground(new Color(255, 255, 255, 100));
+            cachedServerOnline = null;
             serverRefreshBtn.setEnabled(false);
             new Thread(() -> {
                 checkServerOnce();
@@ -482,7 +518,6 @@ public class LauncherGUI extends JFrame {
 
         card.add(serverDot,        BorderLayout.WEST);
         card.add(txt,              BorderLayout.CENTER);
-        // Enveloppe pour garder le bouton carré (BorderLayout.EAST étire en hauteur)
         JPanel refreshWrap = new JPanel(new GridBagLayout());
         refreshWrap.setOpaque(false);
         refreshWrap.add(serverRefreshBtn);
@@ -490,7 +525,6 @@ public class LauncherGUI extends JFrame {
         return card;
     }
 
-    /** Vérifie une seule fois si le serveur est joignable, met à jour le cache et l'UI. */
     private void checkServerOnce() {
         boolean online = false;
         try (java.net.Socket s = new java.net.Socket()) {
@@ -502,46 +536,37 @@ public class LauncherGUI extends JFrame {
         SwingUtilities.invokeLater(() -> applyServerState(isOnline));
     }
 
-    /** Applique visuellement l'état du serveur (sans appel réseau). */
     private void applyServerState(boolean isOnline) {
         if (serverDot == null || serverStatusLbl == null) return;
-        Color onlineColor = new Color(52, 211, 153); // vert-jade sémantique
+        Color onlineColor = new Color(52, 211, 153); 
         if (isOnline) {
             serverDot.setForeground(onlineColor);
             serverStatusLbl.setText("Serveur en ligne");
             serverStatusLbl.setForeground(onlineColor);
         } else {
-            serverDot.setForeground(DANGER);
+            serverDot.setForeground(new Color(239, 68, 68));
             serverStatusLbl.setText("Serveur hors ligne");
-            serverStatusLbl.setForeground(DANGER);
+            serverStatusLbl.setForeground(new Color(239, 68, 68));
         }
         serverDot.setToolTipText(isOnline ? "Connecté à " + SERVER_HOST : "Impossible de joindre " + SERVER_HOST);
     }
 
     // ── Carte Auth Microsoft ─────────────────────────────────────
-
-    /** Construit la carte d'authentification Microsoft de la sidebar. */
     private JPanel buildAuthCard() {
         JPanel card = new JPanel(new BorderLayout(10, 0)) {
             @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setPaint(new GradientPaint(0, 0, CARD_BG.brighter(), 0, getHeight(), CARD_BG));
-                g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 12, 12);
-                g2.setColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80));
-                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 12, 12);
-                g2.dispose();
+                paintGlassCard(g, getWidth(), getHeight());
                 super.paintComponent(g);
             }
         };
         card.setOpaque(false);
-        card.setBorder(new javax.swing.border.EmptyBorder(8, 10, 8, 10));
-        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 52));
+        card.setBorder(new EmptyBorder(8, 12, 8, 12));
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 54));
         card.setAlignmentX(LEFT_ALIGNMENT);
 
         JLabel icon = new JLabel("\u25A3");
         icon.setFont(new Font("Segoe UI Symbol", Font.PLAIN, 22));
-        icon.setForeground(TEXT_DIM);
+        icon.setForeground(new Color(255, 255, 255, 100));
         icon.setHorizontalAlignment(SwingConstants.CENTER);
         icon.setPreferredSize(new Dimension(28, 28));
 
@@ -549,10 +574,10 @@ public class LauncherGUI extends JFrame {
         txt.setOpaque(false);
         JLabel topLbl = new JLabel("COMPTE MICROSOFT");
         topLbl.setFont(new Font("Segoe UI", Font.BOLD, 9));
-        topLbl.setForeground(TEXT_DIM);
+        topLbl.setForeground(new Color(255, 255, 255, 120));
         authStatusLbl = new JLabel(config.hasMsaProfile() ? config.getMsaUsername() : "Non connecté");
-        authStatusLbl.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        authStatusLbl.setForeground(config.hasMsaProfile() ? new Color(52, 211, 153) : TEXT_DIM);
+        authStatusLbl.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        authStatusLbl.setForeground(config.hasMsaProfile() ? new Color(52, 211, 153) : Color.WHITE);
         txt.add(topLbl);
         txt.add(authStatusLbl);
 
@@ -561,16 +586,12 @@ public class LauncherGUI extends JFrame {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,      RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-                // Fond cercle — même style que le bouton refresh serveur
-                g2.setColor(getModel().isPressed() ? ACCENT : CONSOLE_BG);
+                g2.setColor(getModel().isPressed() ? ACCENT : new Color(50, 50, 60, 180));
                 g2.fillOval(0, 0, getWidth()-1, getHeight()-1);
-                // Bordure
-                g2.setColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 120));
-                g2.drawOval(0, 0, getWidth()-1, getHeight()-1);
-                // Icône centrée précisément via TextLayout (même méthode que le bouton serveur)
-                java.awt.Font font = new Font("Segoe UI Symbol", Font.PLAIN, 18);
+                
+                java.awt.Font font = new Font("Segoe UI Symbol", Font.PLAIN, 16);
                 g2.setFont(font);
-                g2.setColor(getModel().isPressed() ? CONSOLE_BG : ACCENT);
+                g2.setColor(getModel().isPressed() ? Color.WHITE : new Color(220, 220, 220));
                 String icon = getText();
                 java.awt.font.TextLayout tl = new java.awt.font.TextLayout(icon, font, g2.getFontRenderContext());
                 java.awt.geom.Rectangle2D vb = tl.getBounds();
@@ -586,8 +607,6 @@ public class LauncherGUI extends JFrame {
         authActionBtn.setContentAreaFilled(false);
         authActionBtn.setBorderPainted(false);
         authActionBtn.setOpaque(false);
-        authActionBtn.putClientProperty("JButton.buttonType", "borderless");
-        authActionBtn.putClientProperty("FlatLaf.focusWidth", 0);
         authActionBtn.addActionListener(e -> {
             if (config.hasMsaProfile()) {
                 int confirm = JOptionPane.showConfirmDialog(this,
@@ -611,10 +630,6 @@ public class LauncherGUI extends JFrame {
         return card;
     }
 
-    /**
-     * Met à jour la carte d'auth après connexion ou déconnexion.
-     * @param profile profil obtenu après auth, {@code null} si déconnecté.
-     */
     void updateAuthCard(MicrosoftAuth.McProfile profile) {
         SwingUtilities.invokeLater(() -> {
             if (authStatusLbl == null || authActionBtn == null) return;
@@ -625,7 +640,7 @@ public class LauncherGUI extends JFrame {
                 authActionBtn.setToolTipText("Déconnecter " + profile.username);
             } else {
                 authStatusLbl.setText("Non connecté");
-                authStatusLbl.setForeground(TEXT_DIM);
+                authStatusLbl.setForeground(Color.WHITE);
                 authActionBtn.setText("\u2192");
                 authActionBtn.setToolTipText("Se connecter avec Microsoft");
             }
@@ -634,9 +649,6 @@ public class LauncherGUI extends JFrame {
         });
     }
 
-    /**
-     * Affiche un dialogue avec le code Device Code et lance le polling en arrière-plan.
-     */
     private void showMicrosoftLoginDialog() {
         authActionBtn.setEnabled(false);
         appendLog("[MSA] Démarrage du Device Code Flow...");
@@ -657,7 +669,7 @@ public class LauncherGUI extends JFrame {
             dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
 
             JPanel root = new JPanel(new GridBagLayout());
-            root.setBackground(CONSOLE_BG);
+            root.setBackground(new Color(25, 25, 30));
             root.setBorder(new EmptyBorder(20, 24, 16, 24));
             GridBagConstraints gc = new GridBagConstraints();
             gc.insets  = new java.awt.Insets(4, 0, 4, 0);
@@ -667,15 +679,15 @@ public class LauncherGUI extends JFrame {
 
             JLabel title = new JLabel("Connexion à votre compte Microsoft");
             title.setFont(new Font("Segoe UI", Font.BOLD, 14));
-            title.setForeground(TEXT);
+            title.setForeground(Color.WHITE);
             title.setHorizontalAlignment(SwingConstants.CENTER);
             gc.gridy = 0;
             root.add(title, gc);
 
-            JLabel instr = new JLabel("<html><center>Ouvrez <b>" + dcr.verificationUri
+            JLabel instr = new JLabel("<html><center>Ouvrez <b style='color:#3b82f6'>" + dcr.verificationUri
                 + "</b><br>et saisissez le code ci-dessous&nbsp;:</center></html>");
             instr.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-            instr.setForeground(TEXT_DIM);
+            instr.setForeground(new Color(200, 200, 200));
             instr.setHorizontalAlignment(SwingConstants.CENTER);
             gc.gridy = 1; gc.insets = new java.awt.Insets(4, 0, 8, 0);
             root.add(instr, gc);
@@ -693,32 +705,26 @@ public class LauncherGUI extends JFrame {
 
             JPanel btns = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 10, 0));
             btns.setOpaque(false);
-            JButton copyBtn   = new JButton("Copier le code");
-            JButton openBtn   = new JButton("Ouvrir le navigateur");
-            JButton cancelBtn = new JButton("Annuler");
-            for (JButton b : new JButton[]{copyBtn, openBtn, cancelBtn}) {
-                b.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-                b.setBackground(CARD_BG);
-                b.setForeground(TEXT);
-                b.setFocusPainted(false);
-                btns.add(b);
-            }
+            JButton copyBtn   = mkButton("Copier le code", new Color(50, 50, 55), Color.WHITE, 12, 32);
+            JButton openBtn   = mkButton("Ouvrir", new Color(50, 50, 55), Color.WHITE, 12, 32);
+            JButton cancelBtn = mkButton("Annuler", new Color(50, 50, 55), Color.WHITE, 12, 32);
+            btns.add(copyBtn); btns.add(openBtn); btns.add(cancelBtn);
+            
             copyBtn.addActionListener(ev -> {
                 java.awt.Toolkit.getDefaultToolkit().getSystemClipboard()
                     .setContents(new java.awt.datatransfer.StringSelection(dcr.userCode), null);
-                copyBtn.setFont(new Font("Segoe UI Symbol", Font.PLAIN, 12));
                 copyBtn.setText("\u2713 Copié !");
             });
             openBtn.addActionListener(ev -> {
                 try { java.awt.Desktop.getDesktop().browse(new java.net.URI(dcr.verificationUri)); }
-                catch (Exception ignored) { appendLog("[MSA] Ouvrez : " + dcr.verificationUri); }
+                catch (Exception ignored) {}
             });
             gc.gridy = 3; gc.insets = new java.awt.Insets(4, 0, 0, 0);
             root.add(btns, gc);
 
             JLabel pollLbl = new JLabel("En attente de votre validation...");
             pollLbl.setFont(new Font("Segoe UI", Font.ITALIC, 11));
-            pollLbl.setForeground(TEXT_DIM);
+            pollLbl.setForeground(new Color(150, 150, 150));
             pollLbl.setHorizontalAlignment(SwingConstants.CENTER);
             gc.gridy = 4; gc.insets = new java.awt.Insets(8, 0, 0, 0);
             root.add(pollLbl, gc);
@@ -749,46 +755,37 @@ public class LauncherGUI extends JFrame {
                     appendLog("[MSA] Erreur : " + ex.getMessage());
                     SwingUtilities.invokeLater(() -> {
                         pollLbl.setText("Erreur : " + ex.getMessage());
-                        pollLbl.setForeground(DANGER);
+                        pollLbl.setForeground(new Color(239, 68, 68));
                     });
                 } finally {
                     SwingUtilities.invokeLater(() -> authActionBtn.setEnabled(true));
                 }
             }).start();
 
-            dialog.setVisible(true); // modal — bloque jusqu'à fermeture
+            dialog.setVisible(true);
         }).start();
     }
 
     private JPanel infoCard(String title, JLabel valueLabel) {
         JPanel card = new JPanel(new GridLayout(2, 1, 0, 2)) {
             @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                // Fond dégradé adapté au thème
-                g2.setPaint(new GradientPaint(0, 0, CARD_BG.brighter(), 0, getHeight(), CARD_BG));
-                g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 12, 12);
-                // Bordure
-                g2.setColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80));
-                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 12, 12);
-                g2.dispose();
+                paintGlassCard(g, getWidth(), getHeight());
                 super.paintComponent(g);
             }
         };
         card.setOpaque(false);
-        card.setBorder(new EmptyBorder(8, 10, 8, 10));
-        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 52));
+        card.setBorder(new EmptyBorder(6, 12, 6, 12));
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 46));
         card.setAlignmentX(LEFT_ALIGNMENT);
 
         JLabel t = new JLabel(title);
         t.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        t.setForeground(TEXT_DIM);
+        t.setForeground(new Color(255, 255, 255, 120));
         card.add(t);
         card.add(valueLabel);
         return card;
     }
 
-    /** Conteneur principal de la capsule (remplacé dynamiquement). */
     private JPanel versionCapsuleContainer;
 
     private JPanel buildVersionCapsule() {
@@ -797,30 +794,25 @@ public class LauncherGUI extends JFrame {
         versionCapsuleContainer.setMaximumSize(new Dimension(Integer.MAX_VALUE, 56));
         versionCapsuleContainer.setAlignmentX(LEFT_ALIGNMENT);
 
-        // État initial : chargement
         launcherStatusLabel = new JLabel("v" + config.getLauncherVersion());
         launcherStatusLabel.setFont(new Font("Segoe UI", Font.BOLD, 13));
         launcherStatusLabel.setForeground(TEXT_DIM);
-        applyLauncherButton = new JButton(); // placeholder
+        applyLauncherButton = new JButton(); 
         applyLauncherButton.setVisible(false);
 
         versionCapsuleContainer.add(buildUpToDateCapsule("v" + config.getLauncherVersion(), false), BorderLayout.CENTER);
         return versionCapsuleContainer;
     }
 
-    /** Capsule sobre « à jour » — jade cohérent avec le reste de l'UI */
     private JPanel buildUpToDateCapsule(String version, boolean confirmed) {
-        // Jade identique au voyant serveur et à l'auth
         Color jade    = new Color(52, 211, 153);
-        Color bgGreen  = new Color(jade.getRed(), jade.getGreen(), jade.getBlue(), 30);
-        Color rimGreen = new Color(jade.getRed(), jade.getGreen(), jade.getBlue(), 110);
         JPanel cap = new JPanel(new BorderLayout(8, 0)) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(bgGreen);
+                g2.setColor(new Color(20, 30, 25, 140)); // Vert très foncé translucide
                 g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 14, 14);
-                g2.setColor(rimGreen);
+                g2.setColor(new Color(52, 211, 153, 80));
                 g2.setStroke(new BasicStroke(1f));
                 g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 14, 14);
                 g2.dispose();
@@ -843,21 +835,16 @@ public class LauncherGUI extends JFrame {
         return cap;
     }
 
-    /** Bloc « mise à jour disponible » — élégant, avec transition v_old → v_new + bouton */
     private JPanel buildUpdateAvailableCapsule(String oldVer, String newVer) {
-        Color bgAmber  = new Color(180, 110, 20, 70);
-        Color rimAmber = new Color(225, 160, 50, 150);
-
         JPanel cap = new JPanel(new BorderLayout(0, 6)) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(bgAmber);
+                g2.setColor(new Color(40, 25, 10, 160)); // Ambre foncé translucide
                 g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 16, 16);
-                // Liseré lumineux ambre en haut
-                g2.setPaint(new GradientPaint(0, 0, new Color(225,170,60,180), getWidth(), 0, new Color(225,170,60,40)));
+                g2.setPaint(new GradientPaint(0, 0, new Color(225,170,60,180), getWidth(), 0, new Color(225,170,60,20)));
                 g2.fillRoundRect(0, 0, getWidth()-1, 2, 16, 16);
-                g2.setColor(rimAmber);
+                g2.setColor(new Color(225, 160, 50, 80));
                 g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 16, 16);
                 g2.dispose();
             }
@@ -866,12 +853,10 @@ public class LauncherGUI extends JFrame {
         cap.setBorder(new EmptyBorder(8, 10, 8, 10));
         cap.setMaximumSize(new Dimension(Integer.MAX_VALUE, 66));
 
-        // Ligne du haut : ▲ Mise à jour disponible
-        JLabel title = new JLabel("\u25b2  Mise \u00e0 jour disponible");
+        JLabel title = new JLabel("\u25b2  Mise à jour disponible");
         title.setFont(new Font("Segoe UI Symbol", Font.BOLD, 11));
         title.setForeground(new Color(235, 185, 70));
 
-        // Ligne du bas : v0.0.3 → v0.0.4  [bouton]
         JPanel row = new JPanel(new BorderLayout(6, 0));
         row.setOpaque(false);
 
@@ -910,57 +895,26 @@ public class LauncherGUI extends JFrame {
         return cap;
     }
 
-    // ── Zone principale ───────────────────────────────────────────────────────
+    // ── Zone principale (Main Area) Épurée ───────────────────────────────────
     private JPanel buildMainArea() {
+        // Le panneau est transparent pour laisser apparaitre le full cover
         JPanel main = new JPanel(new BorderLayout());
-        main.setBackground(BG);
-        main.add(buildBanner(),    BorderLayout.NORTH);
-        main.add(buildConsole(),   BorderLayout.CENTER);
+        main.setOpaque(false); 
+        
+        // --- Badge Zokkyen ---
+        JPanel topRow = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        topRow.setOpaque(false);
+        topRow.setBorder(new EmptyBorder(12, 12, 12, 12));
+        topRow.add(buildZokkyenBadge());
+        
+        main.add(topRow, BorderLayout.NORTH);
+        // On ne met plus de console au centre ! L'espace est libre pour l'image de fond
         main.add(buildBottomBar(), BorderLayout.SOUTH);
         return main;
     }
 
-    private JPanel buildBanner() {
-        JPanel banner = new JPanel(null) {  // null layout pour le badge overlay
-            @Override protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,  RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                int w = getWidth(), h = getHeight();
-                if (bannerImg != null) {
-                    // Cover centré : l'image remplit toute la zone sans bandes ni étirement
-                    double scaleW = (double) w / bannerImg.getWidth();
-                    double scaleH = (double) h / bannerImg.getHeight();
-                    double scale  = Math.max(scaleW, scaleH);
-                    int imgW = (int)(bannerImg.getWidth()  * scale);
-                    int imgH = (int)(bannerImg.getHeight() * scale);
-                    int xOff = (w - imgW) / 2;
-                    int yOff = (h - imgH) / 2 + 30; // +30 → décale l'image vers le bas
-                    g2.drawImage(bannerImg, xOff, yOff, imgW, imgH, null);
-                    g2.setColor(new Color(0, 0, 0, 30));
-                    g2.fillRect(0, 0, w, h);
-                } else {
-                    g2.setPaint(new GradientPaint(0, 0, SIDEBAR1, 0, h, BG));
-                    g2.fillRect(0, 0, w, h);
-                }
-                // Dégradé en bas → BG
-                g2.setPaint(new GradientPaint(0, h - 30, new Color(0, 0, 0, 0), 0, h, BG));
-                g2.fillRect(0, h - 30, w, 30);
-                // Lueur accent en bas à gauche
-                g2.setPaint(new RadialGradientPaint(new Point(100, h), 200,
-                    new float[]{0f, 1f}, new Color[]{new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 30), new Color(0, 0, 0, 0)}));
-                g2.fillRect(0, h - 200, 260, 200);
-                g2.dispose();
-            }
-        };
-        banner.setPreferredSize(new Dimension(0, 330));
-        banner.setBackground(BG);
-
-        // ── Badge « Zokkyen » cliquable → GitHub ────────────────────────────────
+    private JComponent buildZokkyenBadge() {
         boolean[] badgeHov = {false};
-        // Badge pilule entièrement custom — on ne délègue JAMAIS à super pour éviter
-        // que FlatLaf peigne un fond rectangulaire opaque par-dessus nos arrondis.
         String BADGE_TEXT = "Zokkyen GitHub \u2192";
         JComponent zokkyenBadge = new JComponent() {
             @Override protected void paintComponent(Graphics g) {
@@ -969,32 +923,29 @@ public class LauncherGUI extends JFrame {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,     RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-                Color[] dark = themeManager.getCurrent().dark;
-                Color bgCol = new Color(dark[ThemeDefinition.IDX_BG].getRed(),
-                                        dark[ThemeDefinition.IDX_BG].getGreen(),
-                                        dark[ThemeDefinition.IDX_BG].getBlue(), badgeHov[0] ? 230 : 190);
-                Color acc = dark[ThemeDefinition.IDX_ACCENT];
+                
+                Color bgCol = new Color(20, 20, 25, badgeHov[0] ? 200 : 120);
+                Color acc = ACCENT;
                 int arc = h;
-                // fond pilule
+                
                 g2.setColor(bgCol);
                 g2.fillRoundRect(0, 0, w - 1, h - 1, arc, arc);
-                // bordure accent
-                g2.setColor(new Color(acc.getRed(), acc.getGreen(), acc.getBlue(), badgeHov[0] ? 220 : 140));
+                g2.setColor(new Color(acc.getRed(), acc.getGreen(), acc.getBlue(), badgeHov[0] ? 255 : 120));
                 g2.setStroke(new BasicStroke(1.2f));
                 g2.drawRoundRect(0, 0, w - 1, h - 1, arc, arc);
-                // texte centré verticalement
+                
                 Font f = new Font("Segoe UI", Font.BOLD, 12);
                 g2.setFont(f);
                 g2.setColor(badgeHov[0] ? acc.brighter() : acc);
                 FontMetrics fm = g2.getFontMetrics();
-                int tx = 10;
+                int tx = 14;
                 int ty = (h - fm.getHeight()) / 2 + fm.getAscent();
                 g2.drawString(BADGE_TEXT, tx, ty);
                 g2.dispose();
             }
             @Override public Dimension getPreferredSize() {
                 FontMetrics fm = getFontMetrics(new Font("Segoe UI", Font.BOLD, 12));
-                return new Dimension(fm.stringWidth(BADGE_TEXT) + 20, fm.getHeight() + 10);
+                return new Dimension(fm.stringWidth(BADGE_TEXT) + 28, fm.getHeight() + 14);
             }
         };
         zokkyenBadge.setOpaque(false);
@@ -1009,86 +960,48 @@ public class LauncherGUI extends JFrame {
             public void mouseExited (MouseEvent e) { badgeHov[0] = false; zokkyenBadge.repaint(); }
         });
         zokkyenBadge.setSize(zokkyenBadge.getPreferredSize());
-        banner.addComponentListener(new java.awt.event.ComponentAdapter() {
-            @Override public void componentResized(java.awt.event.ComponentEvent e) {
-                Dimension ps = zokkyenBadge.getPreferredSize();
-                zokkyenBadge.setSize(ps);
-                zokkyenBadge.setLocation(banner.getWidth() - ps.width - 10, 10);
-            }
-        });
-        banner.add(zokkyenBadge);
-        return banner;
-    }
-
-    private JPanel buildConsole() {
-        JPanel wrap = new JPanel(new BorderLayout());
-        wrap.setBackground(BG);
-        wrap.setBorder(new EmptyBorder(0, 16, 0, 16));
-
-        JLabel title = new JLabel("JOURNAL");
-        title.setFont(new Font("Segoe UI", Font.BOLD, 9));
-        title.setForeground(TEXT_DIM);
-        title.setBorder(new EmptyBorder(8, 4, 6, 0));
-
-        logArea = new JTextArea();
-        logArea.setEditable(false);
-        logArea.setFont(FONT_MONO);
-        logArea.setBackground(CONSOLE_BG);
-        logArea.setForeground(TEXT);
-        logArea.setLineWrap(true);
-        logArea.setWrapStyleWord(true);
-        logArea.setBorder(new EmptyBorder(8, 10, 8, 10));
-        // Empêcher le JTextArea de scroller automatiquement — on gère ça dans appendLog
-        ((javax.swing.text.DefaultCaret) logArea.getCaret())
-            .setUpdatePolicy(javax.swing.text.DefaultCaret.NEVER_UPDATE);
-
-        JScrollPane scroll = new JScrollPane(logArea);
-        logScrollPane = scroll;
-        scroll.setBorder(BorderFactory.createLineBorder(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 100), 1));
-        scroll.getViewport().setBackground(CONSOLE_BG);
-
-        wrap.add(title,  BorderLayout.NORTH);
-        wrap.add(scroll, BorderLayout.CENTER);
-        return wrap;
+        return zokkyenBadge;
     }
 
     private JPanel buildBottomBar() {
         JPanel bar = new JPanel(new BorderLayout(16, 0)) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setPaint(new GradientPaint(0, 0, BTM1, 0, getHeight(), BTM2));
+                // Voile noir au bas pour que la barre se détache bien
+                g2.setPaint(new GradientPaint(0, 0, new Color(10, 10, 15, 0), 0, getHeight(), new Color(10, 10, 15, 200)));
                 g2.fillRect(0, 0, getWidth(), getHeight());
                 g2.dispose();
             }
         };
         bar.setOpaque(false);
-        bar.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(1, 0, 0, 0, new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 100)),
-            new EmptyBorder(10, 16, 10, 16)
-        ));
+        bar.setBorder(new EmptyBorder(20, 30, 30, 30));
 
         // Gauche : statut + progression
-        JPanel left = new JPanel(new BorderLayout(0, 4));
+        JPanel left = new JPanel(new BorderLayout(0, 8));
         left.setOpaque(false);
         statusLabel = new JLabel("Initialisation...");
-        statusLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        statusLabel.setForeground(TEXT);
+        statusLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        statusLabel.setForeground(Color.WHITE);
         progressBar = new JProgressBar(0, 100);
-        progressBar.setPreferredSize(new Dimension(100, 5));
+        progressBar.setPreferredSize(new Dimension(200, 6));
         progressBar.setForeground(ACCENT);
-        progressBar.setBackground(CONSOLE_BG);
+        progressBar.setBackground(new Color(50, 50, 60, 150));
         progressBar.setStringPainted(false);
+        progressBar.setBorderPainted(false);
         left.add(statusLabel,  BorderLayout.NORTH);
         left.add(progressBar, BorderLayout.SOUTH);
 
-        // Droite : boutons
-        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        // Droite : boutons (Logs, Paramètres, Jouer)
+        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 14, 0));
         right.setOpaque(false);
 
-        JButton settingsBtn = mkButton("Paramètres", CARD_BG, TEXT, 14, 40);
-        settingsBtn.setPreferredSize(new Dimension(120, 40));
+        JButton logsBtn = mkButton("Logs", new Color(40, 40, 45, 180), Color.WHITE, 16, 46);
+        logsBtn.addActionListener(e -> showLogsDialog());
+
+        JButton settingsBtn = mkButton("Paramètres", new Color(40, 40, 45, 180), Color.WHITE, 16, 46);
         settingsBtn.addActionListener(e -> openSettings());
 
+        // Bouton Jouer : Massive Glow Effect
         playButton = new JButton("JOUER") {
             boolean hovered = false;
             {
@@ -1100,42 +1013,43 @@ public class LauncherGUI extends JFrame {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                
                 if (isEnabled()) {
-                    int sh = hovered ? 22 : 0;
-                    Color top = new Color(
-                        Math.min(255, ACCENT.getRed()   + 45 + sh),
-                        Math.min(255, ACCENT.getGreen() + 22 + sh),
-                        Math.min(255, ACCENT.getBlue()  + 35 + sh));
-                    Color bot = new Color(
-                        Math.max(0, ACCENT.getRed()   - 12),
-                        Math.max(0, ACCENT.getGreen() -  6),
-                        Math.max(0, ACCENT.getBlue()  -  9));
-                    g2.setPaint(new GradientPaint(0, 0, top, 0, getHeight(), bot));
+                    // Ombre portée / Lueur externe (Glow)
+                    if (hovered) {
+                        g2.setColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 60));
+                        g2.fillRoundRect(0, 0, getWidth(), getHeight(), 30, 30);
+                        g2.setColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 100));
+                        g2.fillRoundRect(2, 2, getWidth()-4, getHeight()-4, 26, 26);
+                    }
+                    
+                    // Dégradé saturé interne
+                    g2.setPaint(new GradientPaint(0, 0, ACCENT.brighter(), 0, getHeight(), ACCENT.darker()));
+                    g2.fillRoundRect(6, 6, getWidth()-12, getHeight()-12, 22, 22);
+                    
+                    // Sheen (Reflet)
+                    g2.setColor(new Color(255, 255, 255, hovered ? 60 : 30));
+                    g2.fillRoundRect(8, 8, getWidth()-16, (getHeight()-16)/2, 18, 18);
                 } else {
-                    g2.setColor(new Color(50, 50, 60));
-                }
-                g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 22, 22);
-                // Sheen — filet blanc en haut pour l'effet brillant
-                if (isEnabled()) {
-                    g2.setColor(new Color(255, 255, 255, hovered ? 50 : 28));
-                    g2.fillRoundRect(3, 2, getWidth()-7, (getHeight()-4)/2, 18, 18);
+                    g2.setColor(new Color(40, 40, 50, 200));
+                    g2.fillRoundRect(6, 6, getWidth()-12, getHeight()-12, 22, 22);
                 }
                 g2.dispose();
                 super.paintComponent(g);
             }
         };
         playButton.setForeground(Color.WHITE);
-        playButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        playButton.setFont(new Font("Segoe UI", Font.BOLD, 18));
         playButton.setFocusPainted(false);
         playButton.setContentAreaFilled(false);
         playButton.setBorderPainted(false);
         playButton.setOpaque(false);
         playButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        playButton.setBorder(new EmptyBorder(0, 24, 0, 24));
-        playButton.setPreferredSize(new Dimension(160, 44));
+        playButton.setPreferredSize(new Dimension(220, 56));
         playButton.setEnabled(false);
         playButton.addActionListener(e -> handlePlayButton());
 
+        right.add(logsBtn);
         right.add(settingsBtn);
         right.add(playButton);
 
@@ -1144,19 +1058,39 @@ public class LauncherGUI extends JFrame {
         return bar;
     }
 
+    // ── Boîte de dialogue des Logs ───────────────────────────────────────────
+    private void showLogsDialog() {
+        JDialog dialog = new JDialog(this, "Journal d'événements", false);
+        dialog.setSize(750, 450);
+        dialog.setLocationRelativeTo(this);
+        
+        JPanel cp = new JPanel(new BorderLayout());
+        cp.setBackground(new Color(20, 20, 25));
+        cp.setBorder(new EmptyBorder(10, 10, 10, 10));
+        cp.add(logScrollPane, BorderLayout.CENTER);
+        
+        JButton closeBtn = mkButton("Fermer", new Color(50, 50, 55), Color.WHITE, 12, 34);
+        closeBtn.addActionListener(e -> dialog.dispose());
+        
+        JPanel bp = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 10));
+        bp.setOpaque(false);
+        bp.add(closeBtn);
+        cp.add(bp, BorderLayout.SOUTH);
+        
+        dialog.setContentPane(cp);
+        dialog.setVisible(true);
+    }
+
     // ═════════════════════════════════════════════════════════════════════════
     //  Info-cards — chargement asynchrone
     // ═════════════════════════════════════════════════════════════════════════
     private void initInfoCards() {
-        // Version du modpack installé (depuis launcher_config)
         String cached = config.getModpackVersion();
         final String mv = (cached != null && !cached.isBlank()) ? cached : "–";
 
-        // Java version (JRE actuel)
         String jvRaw = System.getProperty("java.version", "?");
         final String jv = "Java " + jvRaw.split("\\.")[0].replaceAll("[^0-9]", "");
 
-        // RAM allouée vs totale
         String rs;
         try {
             com.sun.management.OperatingSystemMXBean os =
@@ -1168,7 +1102,6 @@ public class LauncherGUI extends JFrame {
         }
         final String ramStr = rs;
 
-        // Mods actifs
         String ms = "0";
         try {
             File base = new File(config.getInstallPath());
@@ -1206,7 +1139,6 @@ public class LauncherGUI extends JFrame {
     }
 
     private void checkAndUpdate() {
-        // Vérification du serveur Minecraft en parallèle du check modpack
         if (cachedServerOnline == null) {
             new Thread(this::checkServerOnce).start();
         }
@@ -1221,7 +1153,6 @@ public class LauncherGUI extends JFrame {
             if (token == null || token.trim().isEmpty()) {
                 setStatus("Configuration manquante");
                 appendLog("[ERR] Token d'accès au modpack manquant !");
-                appendLog("[>] Configurez launcher_config.json → \"modpackToken\"");
                 SwingUtilities.invokeLater(() -> progressBar.setForeground(DANGER));
                 return;
             }
@@ -1229,8 +1160,8 @@ public class LauncherGUI extends JFrame {
             setStatus("Vérification du modpack...");
             appendLog("[PRÉPARATION] Vérification du modpack...");
             String status = updater.getModpackStatus();
-            cachedModpackStatus = status; // mise en cache pour le rebuild de thème
-            // Mettre à jour la carte modpack avec la version désormais connue
+            cachedModpackStatus = status; 
+            
             String knownVer = config.getModpackVersion();
             if (knownVer != null && !knownVer.isBlank()) {
                 final String verLabel = knownVer;
@@ -1345,7 +1276,6 @@ public class LauncherGUI extends JFrame {
         long t0 = System.currentTimeMillis();
         new Thread(() -> {
             try {
-                // ── Vérification / rafraîchissement du token MSA ──────────────
                 if (config.hasMsaProfile()) {
                     long expiresAt = config.getMsaExpiresAt();
                     boolean expired = System.currentTimeMillis() > expiresAt - 5 * 60 * 1000L;
@@ -1402,12 +1332,11 @@ public class LauncherGUI extends JFrame {
     }
 
     private void openSettings() {
-        // ── Panel principal aux couleurs du launcher ──
         JPanel panel = new JPanel(new GridBagLayout()) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(CONSOLE_BG);
+                g2.setColor(new Color(30, 30, 35));
                 g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 16, 16);
                 g2.dispose();
             }
@@ -1415,11 +1344,9 @@ public class LauncherGUI extends JFrame {
         panel.setOpaque(false);
         panel.setBorder(new EmptyBorder(16, 16, 16, 16));
 
-        UIManager.put("OptionPane.background",        CONSOLE_BG);
-        UIManager.put("Panel.background",             CONSOLE_BG);
-        UIManager.put("OptionPane.messageForeground", TEXT);
-        UIManager.put("Button.background",            CONSOLE_BG);
-        UIManager.put("Button.foreground",            TEXT);
+        UIManager.put("OptionPane.background",        new Color(30, 30, 35));
+        UIManager.put("Panel.background",             new Color(30, 30, 35));
+        UIManager.put("OptionPane.messageForeground", Color.WHITE);
 
         GridBagConstraints c = new GridBagConstraints();
         c.insets = new Insets(7, 7, 7, 7);
@@ -1431,7 +1358,7 @@ public class LauncherGUI extends JFrame {
         c.gridx = 1;
         JComboBox<String> cRam = new JComboBox<>(new String[]{"2 Go","4 Go","6 Go","8 Go","10 Go","12 Go","14 Go","16 Go"});
         cRam.setSelectedItem(config.getRamAllocation());
-        cRam.setForeground(TEXT);
+        cRam.setForeground(Color.WHITE);
         cRam.setBorder(BorderFactory.createLineBorder(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80), 1));
         cRam.setUI(new javax.swing.plaf.basic.BasicComboBoxUI() {
             @Override
@@ -1440,9 +1367,8 @@ public class LauncherGUI extends JFrame {
                     @Override protected void paintComponent(Graphics g) {
                         Graphics2D g2 = (Graphics2D) g.create();
                         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                        g2.setColor(CONSOLE_BG);
+                        g2.setColor(new Color(40, 40, 45));
                         g2.fillRect(0, 0, getWidth(), getHeight());
-                        // Flèche
                         g2.setColor(ACCENT);
                         int cx = getWidth() / 2, cy = getHeight() / 2;
                         int[] xp = {cx - 4, cx + 4, cx};
@@ -1459,32 +1385,31 @@ public class LauncherGUI extends JFrame {
             @Override
             public void installUI(JComponent c) {
                 super.installUI(c);
-                comboBox.setBackground(CONSOLE_BG);
+                comboBox.setBackground(new Color(40, 40, 45));
             }
             @Override
             public void paintCurrentValueBackground(Graphics g, Rectangle bounds, boolean hasFocus) {
-                g.setColor(CONSOLE_BG);
+                g.setColor(new Color(40, 40, 45));
                 g.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
             }
             @Override
             public void paintCurrentValue(Graphics g, Rectangle bounds, boolean hasFocus) {
                 ListCellRenderer<Object> renderer = comboBox.getRenderer();
-                Component c = renderer.getListCellRendererComponent(
+                Component comp = renderer.getListCellRendererComponent(
                         listBox, comboBox.getSelectedItem(), -1, false, false);
-                c.setBackground(CONSOLE_BG);
-                c.setForeground(TEXT);
-                currentValuePane.paintComponent(g, c, comboBox,
+                comp.setBackground(new Color(40, 40, 45));
+                comp.setForeground(Color.WHITE);
+                currentValuePane.paintComponent(g, comp, comboBox,
                         bounds.x, bounds.y, bounds.width, bounds.height, false);
             }
         });
-        // Popup : fond et sélection
         cRam.setRenderer(new DefaultListCellRenderer() {
             @Override
             public Component getListCellRendererComponent(JList<?> list, Object value,
                     int index, boolean isSelected, boolean cellHasFocus) {
                 JLabel lbl = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-                lbl.setBackground(isSelected ? CARD_BG.darker() : CONSOLE_BG);
-                lbl.setForeground(isSelected ? ACCENT : TEXT);
+                lbl.setBackground(isSelected ? new Color(60, 60, 65) : new Color(40, 40, 45));
+                lbl.setForeground(isSelected ? ACCENT : Color.WHITE);
                 lbl.setBorder(new EmptyBorder(4, 10, 4, 10));
                 return lbl;
             }
@@ -1500,7 +1425,7 @@ public class LauncherGUI extends JFrame {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(CONSOLE_BG);
+                g2.setColor(new Color(40, 40, 45));
                 g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 10, 10);
                 g2.setColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80));
                 g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 10, 10);
@@ -1509,12 +1434,12 @@ public class LauncherGUI extends JFrame {
             }
         };
         fPath.setOpaque(false);
-        fPath.setBackground(CONSOLE_BG);
-        fPath.setForeground(TEXT);
-        fPath.setCaretColor(TEXT);
+        fPath.setBackground(new Color(40, 40, 45));
+        fPath.setForeground(Color.WHITE);
+        fPath.setCaretColor(Color.WHITE);
         fPath.setBorder(new EmptyBorder(4, 8, 4, 8));
 
-        JButton browse = mkButton("Parcourir", CONSOLE_BG, TEXT, 10, 28);
+        JButton browse = mkButton("Parcourir", new Color(50, 50, 55), Color.WHITE, 10, 28);
         browse.addActionListener(e -> {
             JFileChooser fc = new JFileChooser();
             fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
@@ -1528,15 +1453,12 @@ public class LauncherGUI extends JFrame {
         pathRow.add(browse, BorderLayout.EAST);
         panel.add(pathRow, c);
 
-        // ── Ligne sélecteur de thème ──────────────────────────────────────────
         c.gridx = 0; c.gridy = 2; c.fill = GridBagConstraints.NONE; c.weightx = 0;
         JLabel lblThemeSelect = settingsLbl("Thème");
         panel.add(lblThemeSelect, c);
         c.gridx = 1; c.fill = GridBagConstraints.HORIZONTAL; c.weightx = 1;
 
-        // Snapshot du thème initial pour pouvoir annuler
         final String[] originalThemeId = {themeManager.getActiveId()};
-
         java.util.List<ThemeDefinition> themeList = new java.util.ArrayList<>(themeManager.getAll());
         JComboBox<ThemeDefinition> cTheme = buildThemeCombo(themeList);
         for (int ti = 0; ti < themeList.size(); ti++) {
@@ -1547,54 +1469,38 @@ public class LauncherGUI extends JFrame {
         }
         panel.add(cTheme, c);
 
-        // ── Ligne mode clair/sombre ───────────────────────────────────────────
         c.gridx = 0; c.gridy = 3; c.fill = GridBagConstraints.NONE; c.weightx = 0;
         JLabel lblTheme = settingsLbl("Mode");
         panel.add(lblTheme, c);
         c.gridx = 1;
 
         boolean[] darkState = {config.isDarkMode()};
-        // Runnable de rafraîchissement du dialog (assigné après la création de tous les composants)
         Runnable[] refreshDialog = {null};
 
-        // Mode — libellé (déclaré avant le listener du switch)
         JLabel switchLbl = new JLabel(darkState[0] ? " Sombre" : " Lumineux");
         switchLbl.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        switchLbl.setForeground(TEXT);
+        switchLbl.setForeground(Color.WHITE);
 
         JToggleButton themeSwitch = new JToggleButton() {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 int w = getWidth(), h = getHeight(), r = h;
-                // Effacer d'abord avec la couleur du fond du dialog pour éviter les artefacts FlatLaf
-                g2.setColor(CONSOLE_BG);
+                g2.setColor(new Color(30, 30, 35));
                 g2.fillRect(0, 0, w, h);
-                // Piste : ACCENT quand actif (mode sombre),
-                // mélange CONSOLE_BG+ACCENT quand inactif → couleur thème sans gris parasite
-                Color inactiveTrack = new Color(
-                    (CONSOLE_BG.getRed()   + ACCENT.getRed())   / 2,
-                    (CONSOLE_BG.getGreen() + ACCENT.getGreen()) / 2,
-                    (CONSOLE_BG.getBlue()  + ACCENT.getBlue())  / 2
-                );
+                Color inactiveTrack = new Color(50, 50, 55);
                 Color track = darkState[0] ? ACCENT : inactiveTrack;
                 g2.setColor(track);
                 g2.fillRoundRect(0, 0, w, h, r, r);
-                // Luminance perçue de la piste (formule BT.601) pour choisir le contraste icône/pastille
                 int lum = (track.getRed() * 299 + track.getGreen() * 587 + track.getBlue() * 114) / 1000;
                 Color onTrack = lum > 160 ? new Color(30, 30, 30) : Color.WHITE;
-                // Icône thème
                 g2.setColor(onTrack);
                 g2.setFont(new Font("Segoe UI Symbol", Font.PLAIN, 11));
                 String icon = darkState[0] ? "☽" : "☀";
                 FontMetrics fm = g2.getFontMetrics();
                 int ty = (h - fm.getHeight()) / 2 + fm.getAscent();
-                if (darkState[0]) {
-                    g2.drawString(icon, 6, ty);
-                } else {
-                    g2.drawString(icon, w - fm.stringWidth(icon) - 6, ty);
-                }
-                // Pastille — couleur contrastante calculée selon la luminance de la piste
+                if (darkState[0]) g2.drawString(icon, 6, ty);
+                else g2.drawString(icon, w - fm.stringWidth(icon) - 6, ty);
                 int knobX = darkState[0] ? w - h + 3 : 3;
                 g2.setColor(onTrack);
                 g2.fillOval(knobX, 3, h - 6, h - 6);
@@ -1610,11 +1516,8 @@ public class LauncherGUI extends JFrame {
         themeSwitch.addActionListener(e -> {
             darkState[0] = !darkState[0];
             themeSwitch.repaint();
-            // Mettre à jour le label AVANT refreshDialog (qui reconstruit le panel)
             switchLbl.setText(darkState[0] ? " Sombre" : " Lumineux");
-            // Aperçu live sans sauvegarder
             rebuildUI(darkState[0]);
-            // Rafraîchit aussi les couleurs du dialog
             if (refreshDialog[0] != null) refreshDialog[0].run();
         });
 
@@ -1624,7 +1527,6 @@ public class LauncherGUI extends JFrame {
         switchRow.add(switchLbl);
         panel.add(switchRow, c);
 
-        // Changement de thème en live depuis le sélecteur
         cTheme.addActionListener(e -> {
             ThemeDefinition sel = (ThemeDefinition) cTheme.getSelectedItem();
             if (sel != null && !sel.id.equals(themeManager.getActiveId())) {
@@ -1634,13 +1536,12 @@ public class LauncherGUI extends JFrame {
             }
         });
 
-        // ── Dialog personnalisée ──
         JDialog dialog = new JDialog(this, "Paramètres", true);
         dialog.setUndecorated(false);
         dialog.setResizable(false);
 
         JButton btnOk     = mkButton("OK", ACCENT, BG, 10, 32);
-        JButton btnCancel = mkButton("Annuler", CARD_BG, TEXT, 10, 32);
+        JButton btnCancel = mkButton("Annuler", new Color(50, 50, 55), Color.WHITE, 10, 32);
         btnOk    .setPreferredSize(new Dimension(90, 32));
         btnCancel.setPreferredSize(new Dimension(90, 32));
 
@@ -1654,26 +1555,13 @@ public class LauncherGUI extends JFrame {
         btnRow.add(btnCancel);
 
         JPanel wrapper = new JPanel(new BorderLayout(0, 12));
-        wrapper.setBackground(CONSOLE_BG);
+        wrapper.setBackground(new Color(20, 20, 25));
         wrapper.setBorder(new EmptyBorder(4, 4, 12, 4));
         wrapper.add(panel,  BorderLayout.CENTER);
         wrapper.add(btnRow, BorderLayout.SOUTH);
 
-        // Assigner le runnable de refresh maintenant que tous les composants existent
         refreshDialog[0] = () -> {
-            wrapper.setBackground(CONSOLE_BG);
-            for (JLabel l : new JLabel[]{lblRam, lblPath, lblThemeSelect, lblTheme, switchLbl}) l.setForeground(TEXT);
-            fPath.setForeground(TEXT);
-            fPath.setCaretColor(TEXT);
-            btnOk.setBackground(ACCENT);
-            btnOk.setForeground(BG);
-            btnCancel.setBackground(CARD_BG);
-            btnCancel.setForeground(TEXT);
-            browse.setBackground(CONSOLE_BG);
-            browse.setForeground(TEXT);
-            cRam.setForeground(TEXT);
-            cRam.setBorder(BorderFactory.createLineBorder(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80), 1));
-            cTheme.setBorder(BorderFactory.createLineBorder(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80), 1));
+            wrapper.setBackground(new Color(20, 20, 25));
             dialog.repaint();
         };
 
@@ -1682,27 +1570,19 @@ public class LauncherGUI extends JFrame {
         dialog.setLocationRelativeTo(this);
         dialog.setVisible(true);
 
-        // Réinitialiser UIManager
         UIManager.put("OptionPane.background",        null);
         UIManager.put("Panel.background",             null);
         UIManager.put("OptionPane.messageForeground", null);
-        UIManager.put("Button.background",            null);
-        UIManager.put("Button.foreground",            null);
 
         if (result[0] == JOptionPane.OK_OPTION) {
             config.setRamAllocation((String) cRam.getSelectedItem());
             config.setInstallPath(fPath.getText());
-            // Thème (id) — déjà appliqué en live, sauvegarder seulement
             ThemeDefinition selectedTheme = (ThemeDefinition) cTheme.getSelectedItem();
             if (selectedTheme != null) config.setActiveTheme(selectedTheme.id);
-            if (darkState[0] != config.isDarkMode()) {
-                // Mode clair/sombre déjà appliqué en live, on sauvegarde juste
-                config.setDarkMode(darkState[0]);
-            }
+            if (darkState[0] != config.isDarkMode()) config.setDarkMode(darkState[0]);
             appendLog("Paramètres enregistrés.");
             new Thread(this::initInfoCards).start();
         } else {
-            // Annuler : revenir au thème et au mode d'origine si changés en live
             boolean themeChanged = !themeManager.getActiveId().equals(originalThemeId[0]);
             boolean modeChanged  = darkState[0] != config.isDarkMode();
             if (themeChanged) themeManager.setActiveId(originalThemeId[0]);
@@ -1727,11 +1607,9 @@ public class LauncherGUI extends JFrame {
         SwingUtilities.invokeLater(() -> {
             if (logScrollPane != null) {
                 javax.swing.JScrollBar bar = logScrollPane.getVerticalScrollBar();
-                // Auto-scroll uniquement si l'utilisateur est déjà en bas (marge 40px)
                 boolean atBottom = bar.getValue() + bar.getVisibleAmount() >= bar.getMaximum() - 40;
                 logArea.append(message + "\n");
                 if (atBottom) {
-                    // Forcer le scroll après que le layout a été mis à jour
                     SwingUtilities.invokeLater(() -> bar.setValue(bar.getMaximum()));
                 }
             } else {
@@ -1744,7 +1622,6 @@ public class LauncherGUI extends JFrame {
     //  Helpers design
     // ═════════════════════════════════════════════════════════════════════════
 
-    /** Bouton arrondi avec effet de survol. */
     private JButton mkButton(String text, Color bg, Color fg, int arc, int height) {
         JButton btn = new JButton(text) {
             @Override protected void paintComponent(Graphics g) {
@@ -1752,8 +1629,7 @@ public class LauncherGUI extends JFrame {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(getBackground());
                 g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, arc, arc);
-                // Bordure subtile
-                g2.setColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 60));
+                g2.setColor(new Color(255, 255, 255, 20)); // Bordure très discrète
                 g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, arc, arc);
                 g2.dispose();
                 super.paintComponent(g);
@@ -1761,13 +1637,13 @@ public class LauncherGUI extends JFrame {
         };
         btn.setBackground(bg);
         btn.setForeground(fg);
-        btn.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 13));
         btn.setFocusPainted(false);
         btn.setContentAreaFilled(false);
         btn.setBorderPainted(false);
         btn.setOpaque(false);
         btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        btn.setBorder(new EmptyBorder(0, 14, 0, 14));
+        btn.setBorder(new EmptyBorder(0, 16, 0, 16));
         btn.setPreferredSize(new Dimension(btn.getPreferredSize().width, height));
         btn.addMouseListener(new MouseAdapter() {
             private Color base = bg;
@@ -1787,24 +1663,8 @@ public class LauncherGUI extends JFrame {
     private JLabel settingsLbl(String text) {
         JLabel l = new JLabel(text);
         l.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        l.setForeground(TEXT);
+        l.setForeground(Color.WHITE);
         return l;
-    }
-
-    private JComponent hLine() {
-        JPanel line = new JPanel() {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                int r = ACCENT.getRed(), gv = ACCENT.getGreen(), b = ACCENT.getBlue();
-                g2.setPaint(new GradientPaint(0, 0, new Color(r, gv, b, 110), getWidth()/2, 0, new Color(r, gv, b, 40)));
-                g2.fillRect(0, 0, getWidth(), 1);
-                g2.dispose();
-            }
-        };
-        line.setOpaque(false);
-        line.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
-        line.setAlignmentX(LEFT_ALIGNMENT);
-        return line;
     }
 
     private Component vSep(int h) {
@@ -1819,13 +1679,9 @@ public class LauncherGUI extends JFrame {
         dir.delete();
     }
 
-    /**
-     * Crée une JComboBox stylée pour la sélection du thème,
-     * cohérente avec le design du dialog paramètres (même style que cRam).
-     */
     private JComboBox<ThemeDefinition> buildThemeCombo(java.util.List<ThemeDefinition> themeList) {
         JComboBox<ThemeDefinition> combo = new JComboBox<>(themeList.toArray(new ThemeDefinition[0]));
-        combo.setForeground(TEXT);
+        combo.setForeground(Color.WHITE);
         combo.setBorder(BorderFactory.createLineBorder(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80), 1));
         combo.setUI(new javax.swing.plaf.basic.BasicComboBoxUI() {
             @Override
@@ -1834,7 +1690,7 @@ public class LauncherGUI extends JFrame {
                     @Override protected void paintComponent(Graphics g) {
                         Graphics2D g2 = (Graphics2D) g.create();
                         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                        g2.setColor(CONSOLE_BG);
+                        g2.setColor(new Color(40, 40, 45));
                         g2.fillRect(0, 0, getWidth(), getHeight());
                         g2.setColor(ACCENT);
                         int cx = getWidth() / 2, cy = getHeight() / 2;
@@ -1852,11 +1708,11 @@ public class LauncherGUI extends JFrame {
             @Override
             public void installUI(JComponent c) {
                 super.installUI(c);
-                comboBox.setBackground(CONSOLE_BG);
+                comboBox.setBackground(new Color(40, 40, 45));
             }
             @Override
             public void paintCurrentValueBackground(Graphics g, Rectangle bounds, boolean hasFocus) {
-                g.setColor(CONSOLE_BG);
+                g.setColor(new Color(40, 40, 45));
                 g.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
             }
             @Override
@@ -1864,8 +1720,8 @@ public class LauncherGUI extends JFrame {
                 ListCellRenderer<Object> renderer = comboBox.getRenderer();
                 Component c2 = renderer.getListCellRendererComponent(
                         listBox, comboBox.getSelectedItem(), -1, false, false);
-                c2.setBackground(CONSOLE_BG);
-                c2.setForeground(TEXT);
+                c2.setBackground(new Color(40, 40, 45));
+                c2.setForeground(Color.WHITE);
                 currentValuePane.paintComponent(g, c2, comboBox,
                         bounds.x, bounds.y, bounds.width, bounds.height, false);
             }
@@ -1875,8 +1731,8 @@ public class LauncherGUI extends JFrame {
             public Component getListCellRendererComponent(JList<?> list, Object value,
                     int index, boolean isSelected, boolean cellHasFocus) {
                 JLabel lbl = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-                lbl.setBackground(isSelected ? CARD_BG.darker() : CONSOLE_BG);
-                lbl.setForeground(isSelected ? ACCENT : TEXT);
+                lbl.setBackground(isSelected ? new Color(60, 60, 65) : new Color(40, 40, 45));
+                lbl.setForeground(isSelected ? ACCENT : Color.WHITE);
                 lbl.setBorder(new EmptyBorder(4, 10, 4, 10));
                 return lbl;
             }
