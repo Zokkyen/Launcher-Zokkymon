@@ -1429,15 +1429,10 @@ public class LauncherGUI extends JFrame {
         c.gridx = 1; c.fill = GridBagConstraints.HORIZONTAL; c.weightx = 1;
 
         JTextField fPath = new JTextField(config.getInstallPath(), 22) {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setColor(CARD_BG);
-                g2.fillRect(0, 0, getWidth(), getHeight());
-                g2.dispose();
-                super.paintComponent(g); // dessine uniquement texte+curseur (opaque=false)
-            }
+            @Override public Color getBackground() { return CARD_BG; }
+            @Override public Color getForeground()  { return TEXT; }
         };
-        fPath.setOpaque(false);
+        fPath.setOpaque(true);
         fPath.setForeground(TEXT);
         fPath.setCaretColor(TEXT);
         fPath.setBorder(BorderFactory.createCompoundBorder(
