@@ -295,7 +295,7 @@ public class LauncherGUI extends JFrame {
     /**
      * Charge la bannière du thème actif dans {@code bannerImg}.
      * Si le thème possède un banner.png externe il est utilisé en priorité,
-     * sinon la bannière intégrée (/banniere.png) est utilisée.
+     * sinon la bannière intégrée (/banner.png) est utilisée.
      */
     private void loadBannerForCurrentTheme() {
         ThemeDefinition t = themeManager.getCurrent();
@@ -303,7 +303,7 @@ public class LauncherGUI extends JFrame {
             bannerImg = t.banner;
             return;
         }
-        bannerImg = loadImage("/banniere.png", "/banniere.jpg", "/zokkymon.png", "/zokkymon.jpg");
+        bannerImg = loadImage("/banner.png", "/zokkymon.png");
     }
 
     // ── Sidebar ──────────────────────────────────────────────────────────────
@@ -929,13 +929,14 @@ public class LauncherGUI extends JFrame {
                 g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
                 int w = getWidth(), h = getHeight();
                 if (bannerImg != null) {
-                    // 0.88 → moins de zoom, plus de l'image visible, rendu plus net
-                    double scale = (double) w / bannerImg.getWidth() * 0.88;
+                    // Cover centré : l'image remplit toute la zone sans bandes ni étirement
+                    double scaleW = (double) w / bannerImg.getWidth();
+                    double scaleH = (double) h / bannerImg.getHeight();
+                    double scale  = Math.max(scaleW, scaleH);
                     int imgW = (int)(bannerImg.getWidth()  * scale);
                     int imgH = (int)(bannerImg.getHeight() * scale);
-                    // Centré horizontalement, ancré par le bas
                     int xOff = (w - imgW) / 2;
-                    int yOff = Math.min(0, h - imgH);
+                    int yOff = (h - imgH) / 2;
                     g2.drawImage(bannerImg, xOff, yOff, imgW, imgH, null);
                     g2.setColor(new Color(0, 0, 0, 30));
                     g2.fillRect(0, 0, w, h);
@@ -943,9 +944,6 @@ public class LauncherGUI extends JFrame {
                     g2.setPaint(new GradientPaint(0, 0, SIDEBAR1, 0, h, BG));
                     g2.fillRect(0, 0, w, h);
                 }
-                // Dégradé en haut — masque le crop naturellement
-                g2.setPaint(new GradientPaint(0, 0, BG, 0, 55, new Color(BG.getRed(), BG.getGreen(), BG.getBlue(), 0)));
-                g2.fillRect(0, 0, w, 55);
                 // Dégradé en bas → BG
                 g2.setPaint(new GradientPaint(0, h - 30, new Color(0, 0, 0, 0), 0, h, BG));
                 g2.fillRect(0, h - 30, w, 30);
