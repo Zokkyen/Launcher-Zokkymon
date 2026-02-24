@@ -936,7 +936,7 @@ public class LauncherGUI extends JFrame {
                     int imgW = (int)(bannerImg.getWidth()  * scale);
                     int imgH = (int)(bannerImg.getHeight() * scale);
                     int xOff = (w - imgW) / 2;
-                    int yOff = (h - imgH) / 2;
+                    int yOff = (h - imgH) / 2 + 30; // +30 → décale l'image vers le bas
                     g2.drawImage(bannerImg, xOff, yOff, imgW, imgH, null);
                     g2.setColor(new Color(0, 0, 0, 30));
                     g2.fillRect(0, 0, w, h);
