@@ -1428,12 +1428,18 @@ public class LauncherGUI extends JFrame {
         panel.add(lblPath, c);
         c.gridx = 1; c.fill = GridBagConstraints.HORIZONTAL; c.weightx = 1;
 
-        JTextField fPath = new JTextField(config.getInstallPath(), 22);
-        fPath.setOpaque(true);
-        fPath.setBackground(CARD_BG);
+        JTextField fPath = new JTextField(config.getInstallPath(), 22) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setColor(CARD_BG);
+                g2.fillRect(0, 0, getWidth(), getHeight());
+                g2.dispose();
+                super.paintComponent(g); // dessine uniquement texte+curseur (opaque=false)
+            }
+        };
+        fPath.setOpaque(false);
         fPath.setForeground(TEXT);
         fPath.setCaretColor(TEXT);
-        fPath.putClientProperty("JComponent.roundRect", true);
         fPath.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 100), 1),
             new EmptyBorder(4, 8, 4, 8)
@@ -1572,13 +1578,13 @@ public class LauncherGUI extends JFrame {
             lblTheme.setForeground(TEXT);
             switchLbl.setForeground(TEXT);
             // Champ chemin
-            fPath.setBackground(CARD_BG);
             fPath.setForeground(TEXT);
             fPath.setCaretColor(TEXT);
             fPath.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 100), 1),
                 new EmptyBorder(4, 8, 4, 8)
             ));
+            fPath.repaint();
             // Boutons
             btnOk.setBackground(ACCENT);
             btnOk.setForeground(BG);
