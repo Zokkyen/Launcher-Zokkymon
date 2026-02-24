@@ -1,0 +1,31 @@
+# ── Build Maven ───────────────────────────────────────────────────────────────
+target/
+*.class
+*.jar
+*.war
+*.ear
+dependency-reduced-pom.xml
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.idea/
+*.iml
+.vscode/
+*.code-workspace
+
+# ── Secrets & données sensibles ───────────────────────────────────────────────
+# config/launcher_config.json contient le modpackToken, le msaClientId réel
+# et le installPath local → ne jamais commiter.
+# src/main/resources/launcher_config.json est la version vide embarquée dans
+# le JAR : elle est safe à commiter (token vide, installPath vide).
+config/launcher_config.json
+
+# KeyStore local (clé AES machine) — propre à chaque installation
+**/.ks
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log

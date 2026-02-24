@@ -1,0 +1,16 @@
+{
+  "modpackInfoUrl": "https://votre-serveur.com/modpack/info.json",
+  "installPath": "",
+  "enableVersionCheck": true,
+  "launcherVersion": "0.0.5",
+  "serverUrl": "https://votre-serveur.com",
+  "launcherInfoUrl": "https://raw.githubusercontent.com/VotreOrg/VotreRepo/main/info.json",
+  "modpackName": "VotreModpack",
+  "language": "fr",
+  "minecraftVersion": "1.21.1",
+  "fabricVersion": "0.18.1",
+  "modpackToken": "VOTRE_TOKEN_MODPACK",
+  "ram": "8 Go",
+  "modpackVersion": "",
+  "msaClientId": "VOTRE_AZURE_CLIENT_ID"
+}

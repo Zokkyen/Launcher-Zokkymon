@@ -1,0 +1,38 @@
+{
+  "_comment": "Fichier de référence pour créer un nouveau thème.",
+  "_instructions": [
+    "Créer un dossier dans ~/.zokkymon/themes/<nom-du-theme>/",
+    "Y placer ce fichier renommé 'theme.json' avec vos couleurs",
+    "Optionnel : ajouter un 'banner.png' dans le même dossier (bannière 900×260 recommandée)",
+    "Relancer le launcher — votre thème apparaît dans Paramètres > Thème"
+  ],
+  "displayName": "Zokkymon (Défaut)",
+  "light": {
+    "bg":       [215, 169, 111],
+    "cardBg":   [230, 192, 142],
+    "sidebar1": [200, 158, 100],
+    "sidebar2": [172, 130,  76],
+    "console":  [172, 130,  76],
+    "accent":   [ 52,  30,  10],
+    "warning":  [160,  85,  20],
+    "danger":   [165,  45,  28],
+    "text":     [ 38,  20,   6],
+    "textDim":  [ 95,  58,  24],
+    "btm1":     [200, 158, 100],
+    "btm2":     [180, 138,  82]
+  },
+  "dark": {
+    "bg":       [ 32,  20,   8],
+    "cardBg":   [ 55,  36,  14],
+    "sidebar1": [ 44,  28,  10],
+    "sidebar2": [ 30,  18,   6],
+    "console":  [ 30,  18,   6],
+    "accent":   [215, 169, 111],
+    "warning":  [200, 130,  45],
+    "danger":   [200,  70,  50],
+    "text":     [235, 210, 175],
+    "textDim":  [160, 128,  80],
+    "btm1":     [ 44,  28,  10],
+    "btm2":     [ 34,  21,   7]
+  }
+}

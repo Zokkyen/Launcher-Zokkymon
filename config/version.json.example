@@ -1,0 +1,23 @@
+{
+  "version": "0.0.2",
+  "minecraftVersion": "1.21.1",
+  "fabricVersion": "0.17.3",
+  "modpackName": "Zokkymon",
+  "files": [
+    {
+      "name": "cobblemon.jar",
+      "path": "mods",
+      "hash": "sha256_hash_here"
+    },
+    {
+      "name": "fabric-api.jar",
+      "path": "mods",
+      "hash": "sha256_hash_here"
+    },
+    {
+      "name": "other-mod.jar",
+      "path": "mods",
+      "hash": "sha256_hash_here"
+    }
+  ]
+}
