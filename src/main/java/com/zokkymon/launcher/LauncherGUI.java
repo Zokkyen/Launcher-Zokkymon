@@ -15,47 +15,36 @@ import java.lang.management.ManagementFactory;
 
 /**
  * Interface principale du launcher — Design moderne "Glassmorphism"
- *
- * Layout : Full Background Cover
- * Sidebar  : Flottante semi-transparente (gauche)
- * Principal: Épuré, bouton Logs, énorme bouton Jouer avec effet Glow.
  */
 public class LauncherGUI extends JFrame {
 
     @java.io.Serial
     private static final long serialVersionUID = 1L;
 
-    // ── Couleurs actives (mises à jour par applyTheme) ───────────────────────
-    static Color BG, CARD_BG, SIDEBAR1, SIDEBAR2, CONSOLE_BG,
-                 ACCENT, WARNING, DANGER, TEXT, TEXT_DIM, BTM1, BTM2;
+    // ── Couleurs et Thèmes ───────────────────────────────────────────────────
+    static Color BG, CARD_BG, SIDEBAR1, CONSOLE_BG, ACCENT, WARNING, DANGER, TEXT, TEXT_DIM;
 
     static void applyTheme(boolean dark) {
         if (dark) {
             BG         = new Color( 10,   0,  21);
             CARD_BG    = new Color( 20,   4,  36);
             SIDEBAR1   = new Color( 16,   2,  30);
-            SIDEBAR2   = new Color(  7,   0,  16);
             CONSOLE_BG = new Color(  5,   0,  12);
             ACCENT     = new Color(255,   0, 170);
             WARNING    = new Color(245, 158,  11);
             DANGER     = new Color(239,  68,  68);
             TEXT       = new Color(240, 232, 255);
-            TEXT_DIM   = new Color( 98,  72, 130);
-            BTM1       = new Color( 14,   2,  26);
-            BTM2       = new Color(  7,   0,  16);
+            TEXT_DIM   = new Color(130, 110, 160);
         } else {
-            BG         = new Color(245, 240, 255);
-            CARD_BG    = new Color(230, 220, 248);
-            SIDEBAR1   = new Color(218, 206, 242);
-            SIDEBAR2   = new Color(202, 188, 232);
-            CONSOLE_BG = new Color(250, 246, 255);
-            ACCENT     = new Color(180,   0, 140);
-            WARNING    = new Color(172,  90,   0);
+            BG         = new Color(242, 242, 248);
+            CARD_BG    = new Color(255, 255, 255);
+            SIDEBAR1   = new Color(255, 255, 255);
+            CONSOLE_BG = new Color(250, 250, 255);
+            ACCENT     = new Color(110,  40, 230);
+            WARNING    = new Color(180,  90,   0);
             DANGER     = new Color(190,  25,  25);
-            TEXT       = new Color( 15,   5,  28);
-            TEXT_DIM   = new Color( 98,  80, 128);
-            BTM1       = new Color(220, 210, 240);
-            BTM2       = new Color(205, 194, 228);
+            TEXT       = new Color( 30,  30,  35);
+            TEXT_DIM   = new Color(100, 100, 120);
         }
     }
 
@@ -129,17 +118,14 @@ public class LauncherGUI extends JFrame {
         logoImg = loadImage("/zokkymon.png", "/zokkymon.ico");
 
         setTitle("Launcher Zokkymon");
-        setSize(1100, 680);
-        setMinimumSize(new Dimension(900, 600));
+        setSize(1000, 640);
+        setResizable(false);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
-        setResizable(true);
         loadWindowIcon();
 
-        // Initialisation des logs avant l'UI pour éviter les NullPointer
         initLogs();
 
-        // On crée la racine qui peindra le fond complet "Cover"
         JPanel root = buildRootPanel();
         setContentPane(root);
         setVisible(true);
@@ -148,10 +134,6 @@ public class LauncherGUI extends JFrame {
         new Thread(this::checkAndUpdate).start();
     }
 
-    /**
-     * Initialise la console de logs en arrière-plan. 
-     * Elle n'est plus affichée par défaut, mais est prête pour la fenêtre de logs.
-     */
     private void initLogs() {
         logArea = new JTextArea();
         logArea.setEditable(false);
@@ -278,42 +260,15 @@ public class LauncherGUI extends JFrame {
     //  Construction de l'UI
     // ═════════════════════════════════════════════════════════════════════════
 
-    /**
-     * Panneau racine dessinant l'image de fond sur l'intégralité de la fenêtre (Glassmorphism bg)
-     */
     private JPanel buildRootPanel() {
         JPanel root = new JPanel(new BorderLayout()) {
             @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
+                // Fond uni derrière la sidebar + fallback si pas d'image
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,  RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                
-                int w = getWidth(), h = getHeight();
-                
-                if (bannerImg != null) {
-                    // Calcul cover pour remplir l'écran sans distorsion
-                    double scaleW = (double) w / bannerImg.getWidth();
-                    double scaleH = (double) h / bannerImg.getHeight();
-                    double scale  = Math.max(scaleW, scaleH);
-                    int imgW = (int)(bannerImg.getWidth()  * scale);
-                    int imgH = (int)(bannerImg.getHeight() * scale);
-                    int xOff = (w - imgW) / 2;
-                    int yOff = (h - imgH) / 2; 
-                    
-                    g2.drawImage(bannerImg, xOff, yOff, imgW, imgH, null);
-                } else {
-                    g2.setPaint(new GradientPaint(0, 0, SIDEBAR1, 0, h, BG));
-                    g2.fillRect(0, 0, w, h);
-                }
-                
-                // Overlay uniquement en mode sombre, très léger — en mode clair : aucun filtre
-                boolean isDark = (BG.getRed() + BG.getGreen() + BG.getBlue()) < 200;
-                if (isDark) {
-                    g2.setColor(new Color(BG.getRed(), BG.getGreen(), BG.getBlue(), 55));
-                    g2.fillRect(0, 0, w, h);
-                }
+                g2.setColor(BG);
+                g2.fillRect(0, 0, getWidth(), getHeight());
                 g2.dispose();
             }
         };
@@ -356,11 +311,9 @@ public class LauncherGUI extends JFrame {
         JPanel s = new JPanel() {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                // Fond Glassmorphism : Opaque sombre semi-transparent au lieu du dégradé plein
                 g2.setColor(new Color(SIDEBAR1.getRed(), SIDEBAR1.getGreen(), SIDEBAR1.getBlue(), 210));
                 g2.fillRect(0, 0, getWidth(), getHeight());
                 
-                // Ligne séparatrice subtile
                 Color sep = new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 40);
                 g2.setColor(sep);
                 g2.fillRect(getWidth()-1, 0, 1, getHeight());
@@ -369,35 +322,33 @@ public class LauncherGUI extends JFrame {
         };
         s.setLayout(new BoxLayout(s, BoxLayout.Y_AXIS));
         s.setOpaque(false);
-        s.setPreferredSize(new Dimension(240, 0));
-        s.setBorder(new EmptyBorder(20, 16, 16, 16));
+        s.setPreferredSize(new Dimension(250, 0));
+        s.setBorder(new EmptyBorder(15, 15, 15, 15));
 
         s.add(buildLogoBlock());
-        s.add(vSep(24));
+        s.add(vSep(20));
         s.add(buildServerStatusPanel());
         s.add(vSep(8));
         s.add(buildAuthCard());
-        s.add(vSep(24));
+        s.add(vSep(20));
 
-        JLabel sec = new JLabel("INFORMATIONS");
-        sec.setFont(new Font("Segoe UI", Font.BOLD, 9));
-        sec.setForeground(TEXT_DIM);
-        sec.setAlignmentX(LEFT_ALIGNMENT);
-        s.add(sec);
-        s.add(vSep(10));
+        JLabel secInfo = new JLabel("INFORMATIONS");
+        secInfo.setFont(new Font("Segoe UI", Font.BOLD, 9));
+        secInfo.setForeground(TEXT_DIM);
+        secInfo.setAlignmentX(LEFT_ALIGNMENT);
+        s.add(secInfo);
+        s.add(vSep(8));
 
         infoModpackVal = infoVal("...");
         infoJavaVal    = infoVal("...");
         infoRamVal     = infoVal("...");
         infoModsVal    = infoVal("...");
 
-        s.add(infoCard("Modpack",    infoModpackVal));
+        s.add(infoCard("Version Modpack", infoModpackVal));
         s.add(vSep(6));
-        s.add(infoCard("Java",       infoJavaVal));
+        s.add(infoCard("Allocation RAM",  infoRamVal));
         s.add(vSep(6));
-        s.add(infoCard("RAM",        infoRamVal));
-        s.add(vSep(6));
-        s.add(infoCard("Mods actifs", infoModsVal));
+        s.add(infoCard("Mods Actifs",     infoModsVal));
 
         s.add(Box.createVerticalGlue());
         s.add(buildVersionCapsule());
@@ -416,7 +367,7 @@ public class LauncherGUI extends JFrame {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                int arc = 20; // Arrondi doux
+                int arc = 20; 
                 g2.setClip(new java.awt.geom.RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), arc, arc));
                 g2.drawImage(logoImg, 0, 0, getWidth(), getHeight(), null);
                 g2.dispose();
@@ -443,16 +394,11 @@ public class LauncherGUI extends JFrame {
         return block;
     }
 
-    // Helper pour dessiner les cartes style Verre/Glassmorphism
     private void paintGlassCard(Graphics g, int width, int height) {
         Graphics2D g2 = (Graphics2D) g.create();
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        
-        // Fond carte — suit la couleur du thème
         g2.setColor(new Color(CARD_BG.getRed(), CARD_BG.getGreen(), CARD_BG.getBlue(), 200));
         g2.fillRoundRect(0, 0, width-1, height-1, 16, 16);
-        
-        // Liseré accent subtil
         g2.setColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 50));
         g2.drawRoundRect(0, 0, width-1, height-1, 16, 16);
         g2.dispose();
@@ -650,7 +596,7 @@ public class LauncherGUI extends JFrame {
                 authActionBtn.setToolTipText("Déconnecter " + profile.username);
             } else {
                 authStatusLbl.setText("Non connecté");
-                authStatusLbl.setForeground(Color.WHITE);
+                authStatusLbl.setForeground(TEXT);
                 authActionBtn.setText("\u2192");
                 authActionBtn.setToolTipText("Se connecter avec Microsoft");
             }
@@ -788,8 +734,8 @@ public class LauncherGUI extends JFrame {
         card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 46));
         card.setAlignmentX(LEFT_ALIGNMENT);
 
-        JLabel t = new JLabel(title);
-        t.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        JLabel t = new JLabel(title.toUpperCase());
+        t.setFont(new Font("Segoe UI", Font.BOLD, 9));
         t.setForeground(TEXT_DIM);
         card.add(t);
         card.add(valueLabel);
@@ -820,7 +766,7 @@ public class LauncherGUI extends JFrame {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(new Color(20, 30, 25, 140)); // Vert très foncé translucide
+                g2.setColor(new Color(20, 30, 25, 140));
                 g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 14, 14);
                 g2.setColor(new Color(52, 211, 153, 80));
                 g2.setStroke(new BasicStroke(1f));
@@ -850,7 +796,7 @@ public class LauncherGUI extends JFrame {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(new Color(40, 25, 10, 160)); // Ambre foncé translucide
+                g2.setColor(new Color(40, 25, 10, 160)); 
                 g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 16, 16);
                 g2.setPaint(new GradientPaint(0, 0, new Color(225,170,60,180), getWidth(), 0, new Color(225,170,60,20)));
                 g2.fillRoundRect(0, 0, getWidth()-1, 2, 16, 16);
@@ -905,20 +851,54 @@ public class LauncherGUI extends JFrame {
         return cap;
     }
 
-    // ── Zone principale (Main Area) Épurée ───────────────────────────────────
+    // ── Zone principale (Main Area) ───────────────────────────────────────────
     private JPanel buildMainArea() {
-        // Le panneau est transparent pour laisser apparaitre le full cover
-        JPanel main = new JPanel(new BorderLayout());
-        main.setOpaque(false); 
-        
-        // --- Badge Zokkyen ---
+        JPanel main = new JPanel(new BorderLayout()) {
+            @Override protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                int w = getWidth(), h = getHeight();
+
+                if (bannerImg != null) {
+                    // Centrage de l'image dans la zone principale uniquement
+                    double scale = Math.max((double) w / bannerImg.getWidth(), (double) h / bannerImg.getHeight());
+                    int imgW = (int)(bannerImg.getWidth()  * scale);
+                    int imgH = (int)(bannerImg.getHeight() * scale);
+                    int xOff = (w - imgW) / 2;
+                    // Légèrement calé en haut pour garder les personnages visibles
+                    int yOff = Math.min(0, (h - imgH) / 2);
+                    g2.drawImage(bannerImg, xOff, yOff, imgW, imgH, null);
+                } else {
+                    g2.setColor(BG);
+                    g2.fillRect(0, 0, w, h);
+                }
+
+                // Voile dégradé gauche : réduit en mode clair (SIDEBAR1 blanc sinon trop visible)
+                boolean isDark = (BG.getRed() + BG.getGreen() + BG.getBlue()) < 200;
+                int veilW   = isDark ? 55 : 20;
+                int veilAlpha = isDark ? 180 : 120;
+                g2.setPaint(new GradientPaint(
+                    0, 0, new Color(SIDEBAR1.getRed(), SIDEBAR1.getGreen(), SIDEBAR1.getBlue(), veilAlpha),
+                    veilW, 0, new Color(0, 0, 0, 0)));
+                g2.fillRect(0, 0, veilW, h);
+
+                // Voile sombre en bas pour lisibilité de la barre
+                int r = BG.getRed(), gv = BG.getGreen(), b = BG.getBlue();
+                g2.setPaint(new GradientPaint(0, h - 130, new Color(r, gv, b, 0), 0, h, new Color(r, gv, b, 210)));
+                g2.fillRect(0, h - 130, w, 130);
+
+                g2.dispose();
+            }
+        };
+        main.setOpaque(false);
+
         JPanel topRow = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         topRow.setOpaque(false);
         topRow.setBorder(new EmptyBorder(12, 12, 12, 12));
         topRow.add(buildZokkyenBadge());
-        
+
         main.add(topRow, BorderLayout.NORTH);
-        // On ne met plus de console au centre ! L'espace est libre pour l'image de fond
         main.add(buildBottomBar(), BorderLayout.SOUTH);
         return main;
     }
@@ -934,16 +914,20 @@ public class LauncherGUI extends JFrame {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,     RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
                 
-                Color bgCol = new Color(20, 20, 25, badgeHov[0] ? 200 : 120);
+                boolean isDark = (BG.getRed() + BG.getGreen() + BG.getBlue()) < 200;
+                // Fond adapté au mode : sombre opaque en dark, clair avec légère teinte en light
+                Color bgCol = isDark
+                    ? new Color(20, 20, 25, badgeHov[0] ? 210 : 140)
+                    : new Color(CARD_BG.getRed(), CARD_BG.getGreen(), CARD_BG.getBlue(), badgeHov[0] ? 245 : 200);
                 Color acc = ACCENT;
                 int arc = h;
-                
+
                 g2.setColor(bgCol);
                 g2.fillRoundRect(0, 0, w - 1, h - 1, arc, arc);
-                g2.setColor(new Color(acc.getRed(), acc.getGreen(), acc.getBlue(), badgeHov[0] ? 255 : 120));
+                g2.setColor(new Color(acc.getRed(), acc.getGreen(), acc.getBlue(), badgeHov[0] ? 255 : 160));
                 g2.setStroke(new BasicStroke(1.2f));
                 g2.drawRoundRect(0, 0, w - 1, h - 1, arc, arc);
-                
+
                 Font f = new Font("Segoe UI", Font.BOLD, 12);
                 g2.setFont(f);
                 g2.setColor(badgeHov[0] ? acc.brighter() : acc);
@@ -973,45 +957,55 @@ public class LauncherGUI extends JFrame {
         return zokkyenBadge;
     }
 
+    // ── BARRE INFÉRIEURE : AFFINÉE ET COLLÉE ─────────────────────────────────
     private JPanel buildBottomBar() {
-        JPanel bar = new JPanel(new BorderLayout(16, 0)) {
+        GlassPanel bottomPanel = new GlassPanel(18, CARD_BG);
+        bottomPanel.setLayout(new BorderLayout(15, 0));
+        bottomPanel.setBorder(new EmptyBorder(10, 15, 10, 15));
+
+        // GAUCHE : Statut + Barre 4px
+        JPanel leftZone = new JPanel(new GridLayout(2, 1, 0, 2));
+        leftZone.setOpaque(false);
+
+        statusLabel = new JLabel("Initialisation...");
+        statusLabel.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        statusLabel.setForeground(TEXT);
+
+        progressBar = new JProgressBar(0, 100) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                // Voile noir au bas pour que la barre se détache bien
-                g2.setPaint(new GradientPaint(0, 0, new Color(BG.getRed(), BG.getGreen(), BG.getBlue(), 0), 0, getHeight(), new Color(BG.getRed(), BG.getGreen(), BG.getBlue(), 220)));
-                g2.fillRect(0, 0, getWidth(), getHeight());
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                // Fond barre
+                g2.setColor(new Color(TEXT_DIM.getRed(), TEXT_DIM.getGreen(), TEXT_DIM.getBlue(), 40));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 4, 4);
+                // Progression
+                int val = getValue();
+                if (val > 0) {
+                    g2.setPaint(new GradientPaint(0, 0, ACCENT, getWidth(), 0, ACCENT.brighter()));
+                    g2.fillRoundRect(0, 0, (int)(getWidth() * (val / 100.0)), getHeight(), 4, 4);
+                }
                 g2.dispose();
             }
         };
-        bar.setOpaque(false);
-        bar.setBorder(new EmptyBorder(20, 30, 30, 30));
-
-        // Gauche : statut + progression
-        JPanel left = new JPanel(new BorderLayout(0, 8));
-        left.setOpaque(false);
-        statusLabel = new JLabel("Initialisation...");
-        statusLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        statusLabel.setForeground(TEXT);
-        progressBar = new JProgressBar(0, 100);
-        progressBar.setPreferredSize(new Dimension(200, 6));
-        progressBar.setForeground(ACCENT);
-        progressBar.setBackground(CONSOLE_BG);
-        progressBar.setStringPainted(false);
+        progressBar.setPreferredSize(new Dimension(240, 4));
+        progressBar.setOpaque(false);
         progressBar.setBorderPainted(false);
-        left.add(statusLabel,  BorderLayout.NORTH);
-        left.add(progressBar, BorderLayout.SOUTH);
+        progressBar.setStringPainted(false);
 
-        // Droite : boutons (Logs, Paramètres, Jouer)
-        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 14, 0));
-        right.setOpaque(false);
+        leftZone.add(statusLabel);
+        leftZone.add(progressBar);
 
-        JButton logsBtn = mkButton("Logs", new Color(40, 40, 45, 180), Color.WHITE, 16, 46);
+        // DROITE : Boutons Compacts
+        JPanel rightZone = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        rightZone.setOpaque(false);
+
+        Color btnBg = new Color(0, 0, 0, 15);
+        JButton logsBtn = mkButton("Logs", btnBg, TEXT, 10, 32);
         logsBtn.addActionListener(e -> showLogsDialog());
 
-        JButton settingsBtn = mkButton("Paramètres", new Color(40, 40, 45, 180), Color.WHITE, 16, 46);
+        JButton settingsBtn = mkButton("Options", btnBg, TEXT, 10, 32);
         settingsBtn.addActionListener(e -> openSettings());
 
-        // Bouton Jouer : Massive Glow Effect
         playButton = new JButton("JOUER") {
             boolean hovered = false;
             {
@@ -1023,49 +1017,45 @@ public class LauncherGUI extends JFrame {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                
                 if (isEnabled()) {
-                    // Ombre portée / Lueur externe (Glow)
                     if (hovered) {
-                        g2.setColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 60));
-                        g2.fillRoundRect(0, 0, getWidth(), getHeight(), 30, 30);
-                        g2.setColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 100));
-                        g2.fillRoundRect(2, 2, getWidth()-4, getHeight()-4, 26, 26);
+                        g2.setColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 50));
+                        g2.fillRoundRect(0, 0, getWidth(), getHeight(), 15, 15);
                     }
-                    
-                    // Dégradé saturé interne
-                    g2.setPaint(new GradientPaint(0, 0, ACCENT.brighter(), 0, getHeight(), ACCENT.darker()));
-                    g2.fillRoundRect(6, 6, getWidth()-12, getHeight()-12, 22, 22);
-                    
-                    // Sheen (Reflet)
-                    g2.setColor(new Color(255, 255, 255, hovered ? 60 : 30));
-                    g2.fillRoundRect(8, 8, getWidth()-16, (getHeight()-16)/2, 18, 18);
+                    g2.setPaint(new GradientPaint(0, 0, ACCENT.brighter(), 0, getHeight(), ACCENT));
+                    g2.fillRoundRect(hovered?1:2, hovered?1:2, getWidth()-(hovered?2:4), getHeight()-(hovered?2:4), 14, 14);
+                    g2.setColor(new Color(255, 255, 255, hovered ? 50 : 25));
+                    g2.fillRoundRect(4, 3, getWidth()-8, (getHeight()-6)/2, 10, 10);
                 } else {
-                    g2.setColor(new Color(40, 40, 50, 200));
-                    g2.fillRoundRect(6, 6, getWidth()-12, getHeight()-12, 22, 22);
+                    g2.setColor(new Color(100, 100, 110, 150));
+                    g2.fillRoundRect(2, 2, getWidth()-4, getHeight()-4, 14, 14);
                 }
                 g2.dispose();
                 super.paintComponent(g);
             }
         };
+        playButton.setFont(new Font("Segoe UI", Font.BOLD, 15));
         playButton.setForeground(Color.WHITE);
-        playButton.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        playButton.setFocusPainted(false);
+        playButton.setPreferredSize(new Dimension(150, 42));
         playButton.setContentAreaFilled(false);
         playButton.setBorderPainted(false);
-        playButton.setOpaque(false);
+        playButton.setFocusPainted(false);
         playButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        playButton.setPreferredSize(new Dimension(220, 56));
         playButton.setEnabled(false);
         playButton.addActionListener(e -> handlePlayButton());
 
-        right.add(logsBtn);
-        right.add(settingsBtn);
-        right.add(playButton);
+        rightZone.add(settingsBtn);
+        rightZone.add(logsBtn);
+        rightZone.add(playButton);
 
-        bar.add(left,  BorderLayout.CENTER);
-        bar.add(right, BorderLayout.EAST);
-        return bar;
+        bottomPanel.add(leftZone, BorderLayout.WEST);
+        bottomPanel.add(rightZone, BorderLayout.EAST);
+
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.setOpaque(false);
+        wrapper.setBorder(new EmptyBorder(0, 15, 15, 15));
+        wrapper.add(bottomPanel, BorderLayout.CENTER);
+        return wrapper;
     }
 
     // ── Boîte de dialogue des Logs ───────────────────────────────────────────
@@ -1437,7 +1427,6 @@ public class LauncherGUI extends JFrame {
         fPath.setForeground(TEXT);
         fPath.setCaretColor(TEXT);
 
-        // Panel qui peint CARD_BG + bordure accent lui-même — FlatLaf ne touche pas au fond
         JPanel pathBg = new JPanel(new BorderLayout()) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -1482,8 +1471,7 @@ public class LauncherGUI extends JFrame {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 int w = getWidth(), h = getHeight(), r = h;
-                // Pas de fillRect: le composant est opaque=false, le fond du parent transparaît
-                Color inactiveTrack = CARD_BG;
+                Color inactiveTrack = new Color(TEXT_DIM.getRed(), TEXT_DIM.getGreen(), TEXT_DIM.getBlue(), 110);
                 Color track = darkState[0] ? ACCENT : inactiveTrack;
                 g2.setColor(track);
                 g2.fillRoundRect(0, 0, w, h, r, r);
@@ -1548,30 +1536,26 @@ public class LauncherGUI extends JFrame {
         wrapper.add(btnRow, BorderLayout.SOUTH);
 
         refreshDialog[0] = () -> {
-            // Fonds
             wrapper.setBackground(BG);
             UIManager.put("OptionPane.background",        BG);
             UIManager.put("Panel.background",             BG);
             UIManager.put("OptionPane.messageForeground", TEXT);
-            // Labels
             lblRam.setForeground(TEXT);
             lblPath.setForeground(TEXT);
             lblTheme.setForeground(TEXT);
             switchLbl.setForeground(TEXT);
-            // Champ chemin
             fPath.setForeground(TEXT);
             fPath.setCaretColor(TEXT);
             pathBg.repaint();
-            // Boutons
             btnOk.setBackground(ACCENT);
             btnOk.setForeground(BG);
             btnCancel.setBackground(CARD_BG);
             btnCancel.setForeground(TEXT);
             browse.setBackground(CARD_BG);
             browse.setForeground(TEXT);
-            // Combos
             cRam.setForeground(TEXT);
-            // Repaint global
+            cRam.setBackground(CARD_BG);
+            cRam.repaint();
             panel.repaint();
             wrapper.repaint();
             dialog.repaint();
@@ -1608,7 +1592,22 @@ public class LauncherGUI extends JFrame {
     }
 
     public void setStatus(String status) {
-        SwingUtilities.invokeLater(() -> statusLabel.setText(status));
+        SwingUtilities.invokeLater(() -> {
+            statusLabel.setText(status);
+            if (status.startsWith("Prêt") || status.startsWith("Session")) {
+                statusLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+                statusLabel.setForeground(ACCENT);
+            } else if (status.toLowerCase().contains("erreur") || status.contains("introuvable")) {
+                statusLabel.setFont(new Font("Segoe UI", Font.BOLD, 13));
+                statusLabel.setForeground(DANGER);
+            } else if (status.contains("requise") || status.contains("disponible")) {
+                statusLabel.setFont(new Font("Segoe UI", Font.BOLD, 13));
+                statusLabel.setForeground(WARNING);
+            } else {
+                statusLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+                statusLabel.setForeground(TEXT);
+            }
+        });
     }
 
     public void appendLog(String message) {
@@ -1630,34 +1629,27 @@ public class LauncherGUI extends JFrame {
     //  Helpers design
     // ═════════════════════════════════════════════════════════════════════════
 
-    private JButton mkButton(String text, Color bg, Color fg, int arc, int height) {
-        JButton btn = new JButton(text) {
+    private JButton mkButton(String txt, Color bg, Color fg, int arc, int h) {
+        JButton btn = new JButton(txt) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(getBackground());
-                g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, arc, arc);
-                g2.setColor(new Color(255, 255, 255, 20)); // Bordure très discrète
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), arc, arc);
+                g2.setColor(new Color(fg.getRed(), fg.getGreen(), fg.getBlue(), 40));
                 g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, arc, arc);
                 g2.dispose();
                 super.paintComponent(g);
             }
         };
-        btn.setBackground(bg);
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 12));
         btn.setForeground(fg);
-        btn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        btn.setBackground(bg);
         btn.setFocusPainted(false);
         btn.setContentAreaFilled(false);
         btn.setBorderPainted(false);
-        btn.setOpaque(false);
         btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        btn.setBorder(new EmptyBorder(0, 16, 0, 16));
-        btn.setPreferredSize(new Dimension(btn.getPreferredSize().width, height));
-        btn.addMouseListener(new MouseAdapter() {
-            private Color base = bg;
-            public void mouseEntered(MouseEvent e) { base = btn.getBackground(); btn.setBackground(base.brighter()); }
-            public void mouseExited (MouseEvent e) { btn.setBackground(base); }
-        });
+        btn.setPreferredSize(new Dimension(btn.getPreferredSize().width + 20, h));
         return btn;
     }
 
@@ -1685,5 +1677,24 @@ public class LauncherGUI extends JFrame {
             if (files != null) for (File f : files) deleteDirectory(f);
         }
         dir.delete();
+    }
+
+    // ── CLASSE INTERNE POUR EFFET GLASSMORPHISM ──────────────────────────────
+    private class GlassPanel extends JPanel {
+        private final int radius;
+        private final Color base;
+        public GlassPanel(int r, Color b) { this.radius = r; this.base = b; setOpaque(false); }
+        @Override protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            // Plus opaque en mode clair pour garder le texte lisible
+            int alpha = (base.getRed() > 220) ? 235 : 190;
+            g2.setColor(new Color(base.getRed(), base.getGreen(), base.getBlue(), alpha));
+            g2.fillRoundRect(0, 0, getWidth(), getHeight(), radius, radius);
+            g2.setColor(new Color(255, 255, 255, 40));
+            g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, radius, radius);
+            g2.dispose();
+            super.paintComponent(g);
+        }
     }
 }
