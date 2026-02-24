@@ -552,22 +552,28 @@ public class LauncherGUI extends JFrame {
         authActionBtn = new JButton(config.hasMsaProfile() ? "\u2715" : "\u2192") {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,      RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                // Fond cercle — même style que le bouton refresh serveur
                 g2.setColor(getModel().isPressed() ? ACCENT : CONSOLE_BG);
                 g2.fillOval(0, 0, getWidth()-1, getHeight()-1);
+                // Bordure
                 g2.setColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 120));
                 g2.drawOval(0, 0, getWidth()-1, getHeight()-1);
-                g2.setFont(new Font("Segoe UI Symbol", Font.PLAIN, 14));
+                // Icône centrée précisément via TextLayout (même méthode que le bouton serveur)
+                java.awt.Font font = new Font("Segoe UI Symbol", Font.PLAIN, 18);
+                g2.setFont(font);
                 g2.setColor(getModel().isPressed() ? CONSOLE_BG : ACCENT);
-                FontMetrics fm = g2.getFontMetrics();
-                String txt2 = getText();
-                int x = (getWidth() - fm.stringWidth(txt2)) / 2;
-                int y = (getHeight() + fm.getAscent() - fm.getDescent()) / 2;
-                g2.drawString(txt2, x, y);
+                String icon = getText();
+                java.awt.font.TextLayout tl = new java.awt.font.TextLayout(icon, font, g2.getFontRenderContext());
+                java.awt.geom.Rectangle2D vb = tl.getBounds();
+                int x = (int) Math.round((getWidth()  - vb.getWidth())  / 2.0 - vb.getX());
+                int y = (int) Math.round((getHeight() - vb.getHeight()) / 2.0 - vb.getY());
+                g2.drawString(icon, x, y);
                 g2.dispose();
             }
         };
-        authActionBtn.setPreferredSize(new Dimension(28, 28));
+        authActionBtn.setPreferredSize(new Dimension(32, 32));
         authActionBtn.setToolTipText(config.hasMsaProfile() ? "Déconnecter" : "Se connecter avec Microsoft");
         authActionBtn.setFocusPainted(false);
         authActionBtn.setContentAreaFilled(false);
