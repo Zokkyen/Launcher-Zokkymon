@@ -89,8 +89,6 @@ public class LauncherGUI extends JFrame {
     private volatile String  cachedInfoMods       = null;
 
     // ── Polices statiques (évite des allocations à chaque repaint) ───────────
-    private static final Font FONT_SIG1  = new Font("Segoe UI", Font.ITALIC, 10);
-    private static final Font FONT_SIG2  = new Font("Segoe UI", Font.BOLD,   14);
     private static final Font FONT_MONO  = new Font("Consolas", Font.PLAIN,  12);
 
     // ── Cache images (chargées une seule fois, réutilisées au rebuild) ────────
@@ -305,7 +303,7 @@ public class LauncherGUI extends JFrame {
             bannerImg = t.banner;
             return;
         }
-        bannerImg = loadImage("/banniere.png", "/zokkymon.png");
+        bannerImg = loadImage("/banniere.png", "/banniere.jpg", "/zokkymon.png");
     }
 
     // ── Sidebar ──────────────────────────────────────────────────────────────
@@ -367,10 +365,20 @@ public class LauncherGUI extends JFrame {
         block.setMaximumSize(new Dimension(Integer.MAX_VALUE, 64));
         block.setAlignmentX(LEFT_ALIGNMENT);
 
-        JLabel logo = new JLabel();
+        JLabel logo = new JLabel() {
+            @Override protected void paintComponent(Graphics g) {
+                if (logoImg == null) { super.paintComponent(g); return; }
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                int arc = getWidth(); // cercle complet — mettre 12 pour juste arrondi
+                g2.setClip(new java.awt.geom.RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), arc, arc));
+                g2.drawImage(logoImg, 0, 0, getWidth(), getHeight(), null);
+                g2.dispose();
+            }
+        };
         logo.setPreferredSize(new Dimension(48, 48));
-        if (logoImg != null)
-            logo.setIcon(new ImageIcon(logoImg.getScaledInstance(48, 48, Image.SCALE_SMOOTH)));
+        logo.setOpaque(false);
 
         JPanel txt = new JPanel(new GridLayout(2, 1, 0, 2));
         txt.setOpaque(false);
@@ -946,7 +954,7 @@ public class LauncherGUI extends JFrame {
 
         // ── Badge « Zokkyen » cliquable → GitHub ────────────────────────────────
         boolean[] badgeHov = {false};
-        JLabel zokkyenBadge = new JLabel("Zokkyen ↗") {
+        JLabel zokkyenBadge = new JLabel("Zokkyen GitHub ↗") {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
