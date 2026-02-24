@@ -228,7 +228,7 @@ public class ConfigManager {
     }
 
     public boolean isDarkMode() {
-        return config.optBoolean("darkMode", false);
+        return config.optBoolean("darkMode", true);
     }
 
     public void setDarkMode(boolean dark) {

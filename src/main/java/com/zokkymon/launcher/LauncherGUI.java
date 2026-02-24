@@ -303,7 +303,7 @@ public class LauncherGUI extends JFrame {
             bannerImg = t.banner;
             return;
         }
-        bannerImg = loadImage("/banniere.png", "/banniere.jpg", "/zokkymon.png");
+        bannerImg = loadImage("/banniere.png", "/banniere.jpg", "/zokkymon.png", "/zokkymon.jpg");
     }
 
     // ── Sidebar ──────────────────────────────────────────────────────────────
@@ -808,10 +808,12 @@ public class LauncherGUI extends JFrame {
         return versionCapsuleContainer;
     }
 
-    /** Capsule sobre « à jour » — fond vert opaque, icone ✓ visible sur fond clair */
+    /** Capsule sobre « à jour » — jade cohérent avec le reste de l'UI */
     private JPanel buildUpToDateCapsule(String version, boolean confirmed) {
-        Color bgGreen  = new Color(34, 110, 34, 200);
-        Color rimGreen = new Color(28, 90, 28);
+        // Jade identique au voyant serveur et à l'auth
+        Color jade    = new Color(52, 211, 153);
+        Color bgGreen  = new Color(jade.getRed(), jade.getGreen(), jade.getBlue(), 30);
+        Color rimGreen = new Color(jade.getRed(), jade.getGreen(), jade.getBlue(), 110);
         JPanel cap = new JPanel(new BorderLayout(8, 0)) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -819,6 +821,7 @@ public class LauncherGUI extends JFrame {
                 g2.setColor(bgGreen);
                 g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 14, 14);
                 g2.setColor(rimGreen);
+                g2.setStroke(new BasicStroke(1f));
                 g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 14, 14);
                 g2.dispose();
             }
@@ -829,11 +832,11 @@ public class LauncherGUI extends JFrame {
 
         JLabel icon = new JLabel(confirmed ? "\u2713" : "\u25cf");
         icon.setFont(new Font("Segoe UI Symbol", Font.BOLD, 14));
-        icon.setForeground(new Color(190, 255, 160));
+        icon.setForeground(jade);
 
         JLabel lbl = new JLabel(confirmed ? version + "  —  À jour" : version);
         lbl.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        lbl.setForeground(new Color(210, 255, 190));
+        lbl.setForeground(jade);
 
         cap.add(icon, BorderLayout.WEST);
         cap.add(lbl,  BorderLayout.CENTER);
@@ -922,14 +925,18 @@ public class LauncherGUI extends JFrame {
             @Override protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,  RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
                 int w = getWidth(), h = getHeight();
                 if (bannerImg != null) {
-                    double scale = (double) w / bannerImg.getWidth();
+                    // 0.88 → moins de zoom, plus de l'image visible, rendu plus net
+                    double scale = (double) w / bannerImg.getWidth() * 0.88;
+                    int imgW = (int)(bannerImg.getWidth()  * scale);
                     int imgH = (int)(bannerImg.getHeight() * scale);
-                    // Ancre l'image par le bas — les persos en bas sont toujours visibles
+                    // Centré horizontalement, ancré par le bas
+                    int xOff = (w - imgW) / 2;
                     int yOff = Math.min(0, h - imgH);
-                    g2.drawImage(bannerImg, 0, yOff, w, imgH, null);
+                    g2.drawImage(bannerImg, xOff, yOff, imgW, imgH, null);
                     g2.setColor(new Color(0, 0, 0, 30));
                     g2.fillRect(0, 0, w, h);
                 } else {
