@@ -81,6 +81,7 @@ Ce projet :
 - N’a aucun but commercial.
 - Ne distribue aucun contenu payant.
 - Nécessite un compte Minecraft officiel valide.
+- Les images, pour le moment, sont générés par IA. Elles seront remplacées par la suite.
 
 ---
 
