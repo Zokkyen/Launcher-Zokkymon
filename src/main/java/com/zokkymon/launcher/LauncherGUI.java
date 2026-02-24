@@ -156,7 +156,7 @@ public class LauncherGUI extends JFrame {
         ((javax.swing.text.DefaultCaret) logArea.getCaret()).setUpdatePolicy(javax.swing.text.DefaultCaret.NEVER_UPDATE);
 
         logScrollPane = new JScrollPane(logArea);
-        logScrollPane.setBorder(BorderFactory.createLineBorder(new Color(255, 255, 255, 30), 1));
+        logScrollPane.setBorder(BorderFactory.createLineBorder(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80), 1));
         logScrollPane.getViewport().setBackground(new Color(20, 20, 25));
     }
 
@@ -349,11 +349,11 @@ public class LauncherGUI extends JFrame {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 // Fond Glassmorphism : Opaque sombre semi-transparent au lieu du dégradé plein
-                g2.setColor(new Color(10, 10, 15, 120));
+                g2.setColor(new Color(SIDEBAR1.getRed(), SIDEBAR1.getGreen(), SIDEBAR1.getBlue(), 210));
                 g2.fillRect(0, 0, getWidth(), getHeight());
                 
                 // Ligne séparatrice subtile
-                Color sep = new Color(255, 255, 255, 20);
+                Color sep = new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 40);
                 g2.setColor(sep);
                 g2.fillRect(getWidth()-1, 0, 1, getHeight());
                 g2.dispose();
@@ -373,7 +373,7 @@ public class LauncherGUI extends JFrame {
 
         JLabel sec = new JLabel("INFORMATIONS");
         sec.setFont(new Font("Segoe UI", Font.BOLD, 9));
-        sec.setForeground(new Color(255, 255, 255, 120));
+        sec.setForeground(TEXT_DIM);
         sec.setAlignmentX(LEFT_ALIGNMENT);
         s.add(sec);
         s.add(vSep(10));
@@ -421,11 +421,11 @@ public class LauncherGUI extends JFrame {
         txt.setOpaque(false);
         JLabel name = new JLabel(config.getModpackName());
         name.setFont(new Font("Segoe UI", Font.BOLD, 15));
-        name.setForeground(Color.WHITE);
+        name.setForeground(TEXT);
         
         JLabel sub = new JLabel("Minecraft " + config.getMinecraftVersion());
         sub.setFont(new Font("Segoe UI", Font.ITALIC, 12));
-        sub.setForeground(new Color(255, 255, 255, 160));
+        sub.setForeground(TEXT_DIM);
         
         txt.add(name);
         txt.add(sub);
@@ -440,12 +440,12 @@ public class LauncherGUI extends JFrame {
         Graphics2D g2 = (Graphics2D) g.create();
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         
-        // Fond sombre translucide
-        g2.setColor(new Color(30, 30, 35, 160));
+        // Fond carte — suit la couleur du thème
+        g2.setColor(new Color(CARD_BG.getRed(), CARD_BG.getGreen(), CARD_BG.getBlue(), 200));
         g2.fillRoundRect(0, 0, width-1, height-1, 16, 16);
         
-        // Liseré brillant en haut pour l'effet de reflet sur le verre
-        g2.setPaint(new GradientPaint(0, 0, new Color(255, 255, 255, 30), 0, height, new Color(255, 255, 255, 5)));
+        // Liseré accent subtil
+        g2.setColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 50));
         g2.drawRoundRect(0, 0, width-1, height-1, 16, 16);
         g2.dispose();
     }
@@ -465,7 +465,7 @@ public class LauncherGUI extends JFrame {
 
         serverDot = new JLabel("\u25cf");
         serverDot.setFont(new Font("Segoe UI Symbol", Font.PLAIN, 22));
-        serverDot.setForeground(new Color(255, 255, 255, 100));
+        serverDot.setForeground(TEXT_DIM);
         serverDot.setHorizontalAlignment(SwingConstants.CENTER);
         serverDot.setPreferredSize(new Dimension(28, 28));
 
@@ -473,10 +473,10 @@ public class LauncherGUI extends JFrame {
         txt.setOpaque(false);
         JLabel topLbl = new JLabel("SERVEUR");
         topLbl.setFont(new Font("Segoe UI", Font.BOLD, 9));
-        topLbl.setForeground(new Color(255, 255, 255, 120));
+        topLbl.setForeground(TEXT_DIM);
         serverStatusLbl = new JLabel("Vérification...");
         serverStatusLbl.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        serverStatusLbl.setForeground(Color.WHITE);
+        serverStatusLbl.setForeground(TEXT);
         txt.add(topLbl);
         txt.add(serverStatusLbl);
 
@@ -508,8 +508,8 @@ public class LauncherGUI extends JFrame {
         serverRefreshBtn.setOpaque(false);
         serverRefreshBtn.addActionListener(e -> {
             serverStatusLbl.setText("Vérification...");
-            serverStatusLbl.setForeground(new Color(255, 255, 255, 120));
-            serverDot.setForeground(new Color(255, 255, 255, 100));
+            serverStatusLbl.setForeground(TEXT_DIM);
+            serverDot.setForeground(TEXT_DIM);
             cachedServerOnline = null;
             serverRefreshBtn.setEnabled(false);
             new Thread(() -> {
@@ -568,7 +568,7 @@ public class LauncherGUI extends JFrame {
 
         JLabel icon = new JLabel("\u25A3");
         icon.setFont(new Font("Segoe UI Symbol", Font.PLAIN, 22));
-        icon.setForeground(new Color(255, 255, 255, 100));
+        icon.setForeground(TEXT_DIM);
         icon.setHorizontalAlignment(SwingConstants.CENTER);
         icon.setPreferredSize(new Dimension(28, 28));
 
@@ -576,10 +576,10 @@ public class LauncherGUI extends JFrame {
         txt.setOpaque(false);
         JLabel topLbl = new JLabel("COMPTE MICROSOFT");
         topLbl.setFont(new Font("Segoe UI", Font.BOLD, 9));
-        topLbl.setForeground(new Color(255, 255, 255, 120));
+        topLbl.setForeground(TEXT_DIM);
         authStatusLbl = new JLabel(config.hasMsaProfile() ? config.getMsaUsername() : "Non connecté");
         authStatusLbl.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        authStatusLbl.setForeground(config.hasMsaProfile() ? new Color(52, 211, 153) : Color.WHITE);
+        authStatusLbl.setForeground(config.hasMsaProfile() ? new Color(52, 211, 153) : TEXT);
         txt.add(topLbl);
         txt.add(authStatusLbl);
 
@@ -782,7 +782,7 @@ public class LauncherGUI extends JFrame {
 
         JLabel t = new JLabel(title);
         t.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        t.setForeground(new Color(255, 255, 255, 120));
+        t.setForeground(TEXT_DIM);
         card.add(t);
         card.add(valueLabel);
         return card;
@@ -970,7 +970,7 @@ public class LauncherGUI extends JFrame {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 // Voile noir au bas pour que la barre se détache bien
-                g2.setPaint(new GradientPaint(0, 0, new Color(10, 10, 15, 0), 0, getHeight(), new Color(10, 10, 15, 200)));
+                g2.setPaint(new GradientPaint(0, 0, new Color(BG.getRed(), BG.getGreen(), BG.getBlue(), 0), 0, getHeight(), new Color(BG.getRed(), BG.getGreen(), BG.getBlue(), 220)));
                 g2.fillRect(0, 0, getWidth(), getHeight());
                 g2.dispose();
             }
@@ -983,11 +983,11 @@ public class LauncherGUI extends JFrame {
         left.setOpaque(false);
         statusLabel = new JLabel("Initialisation...");
         statusLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        statusLabel.setForeground(Color.WHITE);
+        statusLabel.setForeground(TEXT);
         progressBar = new JProgressBar(0, 100);
         progressBar.setPreferredSize(new Dimension(200, 6));
         progressBar.setForeground(ACCENT);
-        progressBar.setBackground(new Color(50, 50, 60, 150));
+        progressBar.setBackground(CONSOLE_BG);
         progressBar.setStringPainted(false);
         progressBar.setBorderPainted(false);
         left.add(statusLabel,  BorderLayout.NORTH);
