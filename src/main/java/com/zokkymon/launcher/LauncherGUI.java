@@ -336,9 +336,9 @@ public class LauncherGUI extends JFrame {
         s.add(hLine());
         s.add(vSep(16));
 
-        JLabel sec = new JLabel("♥  INFORMATIONS");
-        sec.setFont(new Font("Segoe UI", Font.BOLD, 10));
-        sec.setForeground(ACCENT);
+        JLabel sec = new JLabel("INFORMATIONS");
+        sec.setFont(new Font("Segoe UI", Font.BOLD, 9));
+        sec.setForeground(TEXT_DIM);
         sec.setAlignmentX(LEFT_ALIGNMENT);
         s.add(sec);
         s.add(vSep(10));
@@ -348,13 +348,13 @@ public class LauncherGUI extends JFrame {
         infoRamVal     = infoVal("...");
         infoModsVal    = infoVal("...");
 
-        s.add(infoCard("[#]  Modpack",    infoModpackVal));
-        s.add(vSep(8));
-        s.add(infoCard("[J]  Java",       infoJavaVal));
-        s.add(vSep(8));
-        s.add(infoCard("[R]  RAM",        infoRamVal));
-        s.add(vSep(8));
-        s.add(infoCard("[M]  Mods actifs", infoModsVal));
+        s.add(infoCard("Modpack",    infoModpackVal));
+        s.add(vSep(6));
+        s.add(infoCard("Java",       infoJavaVal));
+        s.add(vSep(6));
+        s.add(infoCard("RAM",        infoRamVal));
+        s.add(vSep(6));
+        s.add(infoCard("Mods actifs", infoModsVal));
 
         s.add(Box.createVerticalGlue());
         s.add(buildVersionCapsule());
@@ -497,12 +497,13 @@ public class LauncherGUI extends JFrame {
     /** Applique visuellement l'état du serveur (sans appel réseau). */
     private void applyServerState(boolean isOnline) {
         if (serverDot == null || serverStatusLbl == null) return;
+        Color onlineColor = new Color(52, 211, 153); // vert-jade sémantique
         if (isOnline) {
-            serverDot.setForeground(new Color(60, 180, 60));
+            serverDot.setForeground(onlineColor);
             serverStatusLbl.setText("Serveur en ligne");
-            serverStatusLbl.setForeground(new Color(40, 120, 40));
+            serverStatusLbl.setForeground(onlineColor);
         } else {
-            serverDot.setForeground(new Color(180, 55, 45));
+            serverDot.setForeground(DANGER);
             serverStatusLbl.setText("Serveur hors ligne");
             serverStatusLbl.setForeground(DANGER);
         }
@@ -543,7 +544,7 @@ public class LauncherGUI extends JFrame {
         topLbl.setForeground(TEXT_DIM);
         authStatusLbl = new JLabel(config.hasMsaProfile() ? config.getMsaUsername() : "Non connecté");
         authStatusLbl.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        authStatusLbl.setForeground(config.hasMsaProfile() ? new Color(40, 200, 80) : TEXT_DIM);
+        authStatusLbl.setForeground(config.hasMsaProfile() ? new Color(52, 211, 153) : TEXT_DIM);
         txt.add(topLbl);
         txt.add(authStatusLbl);
 
@@ -611,7 +612,7 @@ public class LauncherGUI extends JFrame {
             if (authStatusLbl == null || authActionBtn == null) return;
             if (profile != null) {
                 authStatusLbl.setText(profile.username);
-                authStatusLbl.setForeground(new Color(40, 200, 80));
+                authStatusLbl.setForeground(new Color(52, 211, 153));
                 authActionBtn.setText("\u2715");
                 authActionBtn.setToolTipText("Déconnecter " + profile.username);
             } else {
@@ -730,7 +731,7 @@ public class LauncherGUI extends JFrame {
                     updateAuthCard(profile);
                     SwingUtilities.invokeLater(() -> {
                         pollLbl.setText("\u2713 Connecté : " + profile.username);
-                        pollLbl.setForeground(new Color(40, 200, 80));
+                        pollLbl.setForeground(new Color(52, 211, 153));
                     });
                     Thread.sleep(800);
                     SwingUtilities.invokeLater(dialog::dispose);
@@ -918,8 +919,8 @@ public class LauncherGUI extends JFrame {
                 if (bannerImg != null) {
                     double scale = (double) w / bannerImg.getWidth();
                     g2.drawImage(bannerImg, 0, 0, w, (int)(bannerImg.getHeight() * scale), null);
-                    // Voile chaud sur la bannière
-                    g2.setColor(new Color(38, 20, 6, 40));
+                    // Voile sombre neutre
+                    g2.setColor(new Color(0, 0, 0, 35));
                     g2.fillRect(0, 0, w, h);
                 } else {
                     g2.setPaint(new GradientPaint(0, 0, SIDEBAR1, 0, h, BG));
@@ -928,10 +929,10 @@ public class LauncherGUI extends JFrame {
                 // Dégradé en bas → BG harmonisé
                 g2.setPaint(new GradientPaint(0, h-20, new Color(0,0,0,0), 0, h, BG));
                 g2.fillRect(0, h-20, w, 20);
-                // Lueur or ambre en bas à gauche (déco)
-                g2.setPaint(new RadialGradientPaint(new Point(120, h), 130,
-                    new float[]{0f, 1f}, new Color[]{new Color(52,30,10,40), new Color(0,0,0,0)}));
-                g2.fillRect(0, h-130, 280, 130);
+                // Lueur accent en bas à gauche (déco thème-cohérente)
+                g2.setPaint(new RadialGradientPaint(new Point(100, h), 200,
+                    new float[]{0f, 1f}, new Color[]{new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 35), new Color(0,0,0,0)}));
+                g2.fillRect(0, h-200, 260, 200);
                 // Signature "Fait par Zokkyen" — haut droite
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,      RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
@@ -974,9 +975,9 @@ public class LauncherGUI extends JFrame {
         wrap.setBackground(BG);
         wrap.setBorder(new EmptyBorder(0, 16, 0, 16));
 
-        JLabel title = new JLabel("♥  JOURNAL DE DÉMARRAGE");
-        title.setFont(new Font("Segoe UI", Font.BOLD, 10));
-        title.setForeground(ACCENT);
+        JLabel title = new JLabel("JOURNAL");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 9));
+        title.setForeground(TEXT_DIM);
         title.setBorder(new EmptyBorder(8, 4, 6, 0));
 
         logArea = new JTextArea();
@@ -1038,8 +1039,49 @@ public class LauncherGUI extends JFrame {
         settingsBtn.setPreferredSize(new Dimension(120, 40));
         settingsBtn.addActionListener(e -> openSettings());
 
-        playButton = mkButton("JOUER", ACCENT, BG, 22, 44);
+        playButton = new JButton("JOUER") {
+            boolean hovered = false;
+            {
+                addMouseListener(new MouseAdapter() {
+                    public void mouseEntered(MouseEvent e) { hovered = true;  repaint(); }
+                    public void mouseExited (MouseEvent e) { hovered = false; repaint(); }
+                });
+            }
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                if (isEnabled()) {
+                    int sh = hovered ? 22 : 0;
+                    Color top = new Color(
+                        Math.min(255, ACCENT.getRed()   + 45 + sh),
+                        Math.min(255, ACCENT.getGreen() + 22 + sh),
+                        Math.min(255, ACCENT.getBlue()  + 35 + sh));
+                    Color bot = new Color(
+                        Math.max(0, ACCENT.getRed()   - 12),
+                        Math.max(0, ACCENT.getGreen() -  6),
+                        Math.max(0, ACCENT.getBlue()  -  9));
+                    g2.setPaint(new GradientPaint(0, 0, top, 0, getHeight(), bot));
+                } else {
+                    g2.setColor(new Color(50, 50, 60));
+                }
+                g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 22, 22);
+                // Sheen — filet blanc en haut pour l'effet brillant
+                if (isEnabled()) {
+                    g2.setColor(new Color(255, 255, 255, hovered ? 50 : 28));
+                    g2.fillRoundRect(3, 2, getWidth()-7, (getHeight()-4)/2, 18, 18);
+                }
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        playButton.setForeground(Color.WHITE);
         playButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        playButton.setFocusPainted(false);
+        playButton.setContentAreaFilled(false);
+        playButton.setBorderPainted(false);
+        playButton.setOpaque(false);
+        playButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        playButton.setBorder(new EmptyBorder(0, 24, 0, 24));
         playButton.setPreferredSize(new Dimension(160, 44));
         playButton.setEnabled(false);
         playButton.addActionListener(e -> handlePlayButton());

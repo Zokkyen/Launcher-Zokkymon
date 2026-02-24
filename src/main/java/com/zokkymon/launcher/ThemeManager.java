@@ -56,33 +56,34 @@ public class ThemeManager {
     // ── Thème intégré "default" ───────────────────────────────────────────────
 
     private void addBuiltinDefault() {
+        // Palette Graphite · Magenta
         Color[] light = {
-            new Color(215, 169, 111), // 0  bg
-            new Color(230, 192, 142), // 1  cardBg
-            new Color(200, 158, 100), // 2  sidebar1
-            new Color(172, 130,  76), // 3  sidebar2
-            new Color(172, 130,  76), // 4  console
-            new Color( 52,  30,  10), // 5  accent
-            new Color(160,  85,  20), // 6  warning
-            new Color(165,  45,  28), // 7  danger
-            new Color( 38,  20,   6), // 8  text
-            new Color( 95,  58,  24), // 9  textDim
-            new Color(200, 158, 100), // 10 btm1
-            new Color(180, 138,  82)  // 11 btm2
+            new Color(249, 247, 255), // 0  bg          — blanc lavande
+            new Color(238, 234, 250), // 1  cardBg       — lavande clair
+            new Color(230, 226, 245), // 2  sidebar1
+            new Color(218, 213, 238), // 3  sidebar2
+            new Color(252, 250, 255), // 4  console      — quasi-blanc
+            new Color(168,  20, 155), // 5  accent       — magenta profond
+            new Color(180, 108,   0), // 6  warning      — ambre sombre
+            new Color(196,  30,  30), // 7  danger       — rouge sombre
+            new Color( 20,  15,  30), // 8  text         — quasi-noir bleuté
+            new Color(108, 100, 128), // 9  textDim      — gris-violet
+            new Color(228, 223, 243), // 10 btm1
+            new Color(215, 210, 233)  // 11 btm2
         };
         Color[] dark = {
-            new Color( 32,  20,   8), // 0  bg
-            new Color( 55,  36,  14), // 1  cardBg
-            new Color( 44,  28,  10), // 2  sidebar1
-            new Color( 30,  18,   6), // 3  sidebar2
-            new Color( 30,  18,   6), // 4  console
-            new Color(215, 169, 111), // 5  accent
-            new Color(200, 130,  45), // 6  warning
-            new Color(200,  70,  50), // 7  danger
-            new Color(235, 210, 175), // 8  text
-            new Color(160, 128,  80), // 9  textDim
-            new Color( 44,  28,  10), // 10 btm1
-            new Color( 34,  21,   7)  // 11 btm2
+            new Color( 13,  13,  15), // 0  bg          — noir mat bleuté
+            new Color( 22,  22,  28), // 1  cardBg       — graphite
+            new Color( 18,  18,  23), // 2  sidebar1
+            new Color( 10,  10,  13), // 3  sidebar2
+            new Color(  8,   8,  10), // 4  console      — presque noir
+            new Color(220,  50, 195), // 5  accent       — magenta vif
+            new Color(245, 158,  11), // 6  warning      — ambre
+            new Color(239,  68,  68), // 7  danger       — rouge
+            new Color(240, 240, 248), // 8  text         — blanc bleuté
+            new Color( 95,  95, 115), // 9  textDim      — gris bleuté
+            new Color( 16,  16,  21), // 10 btm1
+            new Color( 10,  10,  13)  // 11 btm2
         };
         themes.put("default", new ThemeDefinition("default", "Zokkymon (Défaut)", light, dark, null));
     }
