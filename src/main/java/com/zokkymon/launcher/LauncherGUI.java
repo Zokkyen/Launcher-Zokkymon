@@ -959,40 +959,46 @@ public class LauncherGUI extends JFrame {
 
         // ── Badge « Zokkyen » cliquable → GitHub ────────────────────────────────
         boolean[] badgeHov = {false};
-        JLabel zokkyenBadge = new JLabel("Zokkyen GitHub \u2197") {
+        // Badge pilule entièrement custom — on ne délègue JAMAIS à super pour éviter
+        // que FlatLaf peigne un fond rectangulaire opaque par-dessus nos arrondis.
+        String BADGE_TEXT = "Zokkyen GitHub \u2192";
+        JComponent zokkyenBadge = new JComponent() {
             @Override protected void paintComponent(Graphics g) {
                 int w = getWidth(), h = getHeight();
-                if (w == 0 || h == 0) { super.paintComponent(g); return; }
-                int arc = h; // pilule : arc = hauteur
+                if (w == 0 || h == 0) return;
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,     RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
                 Color[] dark = themeManager.getCurrent().dark;
-                Color bg2 = new Color(dark[ThemeDefinition.IDX_BG].getRed(),
-                                      dark[ThemeDefinition.IDX_BG].getGreen(),
-                                      dark[ThemeDefinition.IDX_BG].getBlue(), badgeHov[0] ? 230 : 190);
+                Color bgCol = new Color(dark[ThemeDefinition.IDX_BG].getRed(),
+                                        dark[ThemeDefinition.IDX_BG].getGreen(),
+                                        dark[ThemeDefinition.IDX_BG].getBlue(), badgeHov[0] ? 230 : 190);
                 Color acc = dark[ThemeDefinition.IDX_ACCENT];
-                // fond arrondi
-                g2.setColor(bg2);
+                int arc = h;
+                // fond pilule
+                g2.setColor(bgCol);
                 g2.fillRoundRect(0, 0, w - 1, h - 1, arc, arc);
-                // bordure
-                g2.setColor(new Color(acc.getRed(), acc.getGreen(), acc.getBlue(), badgeHov[0] ? 220 : 130));
+                // bordure accent
+                g2.setColor(new Color(acc.getRed(), acc.getGreen(), acc.getBlue(), badgeHov[0] ? 220 : 140));
                 g2.setStroke(new BasicStroke(1.2f));
                 g2.drawRoundRect(0, 0, w - 1, h - 1, arc, arc);
+                // texte centré verticalement
+                Font f = new Font("Segoe UI", Font.BOLD, 12);
+                g2.setFont(f);
+                g2.setColor(badgeHov[0] ? acc.brighter() : acc);
+                FontMetrics fm = g2.getFontMetrics();
+                int tx = 10;
+                int ty = (h - fm.getHeight()) / 2 + fm.getAscent();
+                g2.drawString(BADGE_TEXT, tx, ty);
                 g2.dispose();
-                // texte clippé à la pilule pour éviter tout débordement rectangulaire
-                Graphics2D gt = (Graphics2D) g.create();
-                gt.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                gt.setClip(new java.awt.geom.RoundRectangle2D.Float(0, 0, w, h, arc, arc));
-                super.paintComponent(gt);
-                gt.dispose();
+            }
+            @Override public Dimension getPreferredSize() {
+                FontMetrics fm = getFontMetrics(new Font("Segoe UI", Font.BOLD, 12));
+                return new Dimension(fm.stringWidth(BADGE_TEXT) + 20, fm.getHeight() + 10);
             }
         };
-        Color badgeAccent = themeManager.getCurrent().dark[ThemeDefinition.IDX_ACCENT];
-        zokkyenBadge.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        zokkyenBadge.setForeground(badgeAccent);
-        zokkyenBadge.setBorder(new EmptyBorder(4, 10, 4, 10));
-        zokkyenBadge.setCursor(new Cursor(Cursor.HAND_CURSOR));
         zokkyenBadge.setOpaque(false);
+        zokkyenBadge.setCursor(new Cursor(Cursor.HAND_CURSOR));
         zokkyenBadge.addMouseListener(new MouseAdapter() {
             public void mouseClicked(MouseEvent e) {
                 try { java.awt.Desktop.getDesktop().browse(
@@ -1552,7 +1558,7 @@ public class LauncherGUI extends JFrame {
         Runnable[] refreshDialog = {null};
 
         // Mode — libellé (déclaré avant le listener du switch)
-        JLabel switchLbl = new JLabel(darkState[0] ? " Mode sombre" : " Mode clair");
+        JLabel switchLbl = new JLabel(darkState[0] ? " Mode clair" : " Mode sombre");
         switchLbl.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         switchLbl.setForeground(TEXT);
 
@@ -1611,7 +1617,7 @@ public class LauncherGUI extends JFrame {
         });
 
         // Met à jour le libellé du switch quand on bascule
-        themeSwitch.addActionListener(e -> switchLbl.setText(darkState[0] ? " Mode sombre" : " Mode clair"));
+        themeSwitch.addActionListener(e -> switchLbl.setText(darkState[0] ? " Mode clair" : " Mode sombre"));
 
         JPanel switchRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         switchRow.setOpaque(false);
