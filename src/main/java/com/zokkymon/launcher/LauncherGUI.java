@@ -59,6 +59,7 @@ public class LauncherGUI extends JFrame {
     private JLabel infoJavaVal;
     private JLabel infoRamVal;
     private JLabel infoModsVal;
+    private JLabel infoDiskVal;
 
     // ── Capsule version launcher / Console scroll ─────────────────────────────
     private JScrollPane logScrollPane;
@@ -85,6 +86,7 @@ public class LauncherGUI extends JFrame {
     private volatile String  cachedInfoJava       = null;
     private volatile String  cachedInfoRam        = null;
     private volatile String  cachedInfoMods       = null;
+    private volatile String  cachedInfoDisk       = null;
 
     // ── Polices statiques ─────────────────────────────────────────────────────
     private static final Font FONT_MONO  = new Font("Consolas", Font.PLAIN,  12);
@@ -157,6 +159,7 @@ public class LauncherGUI extends JFrame {
                 infoJavaVal   .setText(cachedInfoJava);
                 infoRamVal    .setText(cachedInfoRam);
                 infoModsVal   .setText(cachedInfoMods);
+                infoDiskVal   .setText(cachedInfoDisk != null ? cachedInfoDisk : "...");
             });
         } else {
             new Thread(this::initInfoCards).start();
@@ -343,12 +346,15 @@ public class LauncherGUI extends JFrame {
         infoJavaVal    = infoVal("...");
         infoRamVal     = infoVal("...");
         infoModsVal    = infoVal("...");
+        infoDiskVal    = infoVal("...");
 
         s.add(infoCard("Version Modpack", infoModpackVal));
         s.add(vSep(6));
+        s.add(infoCard("Mods Actifs",     infoModsVal));
+        s.add(vSep(6));
         s.add(infoCard("Allocation RAM",  infoRamVal));
         s.add(vSep(6));
-        s.add(infoCard("Mods Actifs",     infoModsVal));
+        s.add(infoCard("Disque Libre",    infoDiskVal));
 
         s.add(Box.createVerticalGlue());
         s.add(buildVersionCapsule());
@@ -1116,15 +1122,36 @@ public class LauncherGUI extends JFrame {
         } catch (Exception ignored) {}
         final String modsStr = ms;
 
+        String ds;
+        try {
+            java.io.File installFile = new java.io.File(config.getInstallPath());
+            long freeBytes  = installFile.getUsableSpace();
+            long totalBytes = installFile.getTotalSpace();
+            if (freeBytes <= 0 || totalBytes <= 0) {
+                // fallback sur la partition système
+                java.io.File home = new java.io.File(System.getProperty("user.home"));
+                freeBytes  = home.getUsableSpace();
+                totalBytes = home.getTotalSpace();
+            }
+            ds = String.format("%.0f / %.0f Go",
+                    freeBytes  / 1_073_741_824.0,
+                    totalBytes / 1_073_741_824.0);
+        } catch (Exception ignored) {
+            ds = "–";
+        }
+        final String diskStr = ds;
+
         SwingUtilities.invokeLater(() -> {
             cachedInfoModpack = mv;
             cachedInfoJava    = jv;
             cachedInfoRam     = ramStr;
             cachedInfoMods    = modsStr;
+            cachedInfoDisk    = diskStr;
             infoModpackVal.setText(mv);
             infoJavaVal   .setText(jv);
             infoRamVal    .setText(ramStr);
             infoModsVal   .setText(modsStr);
+            infoDiskVal   .setText(diskStr);
         });
     }
 
