@@ -3,11 +3,13 @@ package com.zokkymon.launcher;
 import org.json.*;
 
 import java.awt.Color;
+import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.util.*;
+import javax.imageio.ImageIO;
 
 /**
  * Gère le chargement et la sélection des thèmes du launcher.
@@ -47,6 +49,7 @@ public class ThemeManager {
     public ThemeManager(File zokkymonBaseDir) {
         this.themesDir = new File(zokkymonBaseDir, "themes");
         addBuiltinDefault();
+        loadBuiltinThemesFromClasspath();
         loadExternalThemes();
     }
 
@@ -84,7 +87,36 @@ public class ThemeManager {
         themes.put("default", new ThemeDefinition("default", "Zokkymon (Défaut)", light, dark, null));
     }
 
-    // ── Thèmes externes dans ~/.zokkymon/themes/ ──────────────────────────────
+    // ── Thèmes embarqués dans le JAR (/themes/<id>/) ─────────────────────────
+
+    private void loadBuiltinThemesFromClasspath() {
+        try (InputStream idx = ThemeManager.class.getResourceAsStream("/themes/index.txt")) {
+            if (idx == null) return;
+            new String(idx.readAllBytes(), StandardCharsets.UTF_8)
+                .lines().map(String::strip).filter(s -> !s.isEmpty())
+                .filter(id -> !"default".equals(id))
+                .forEach(id -> {
+                    try (InputStream jsonIs = ThemeManager.class.getResourceAsStream("/themes/" + id + "/theme.json")) {
+                        if (jsonIs == null) return;
+                        JSONObject obj = new JSONObject(new String(jsonIs.readAllBytes(), StandardCharsets.UTF_8));
+                        String displayName = obj.optString("displayName", id);
+                        Color[] light = parsePalette(obj.getJSONObject("light"));
+                        Color[] dark  = parsePalette(obj.getJSONObject("dark"));
+                        BufferedImage banner = null;
+                        try (InputStream bi = ThemeManager.class.getResourceAsStream("/themes/" + id + "/banner.png")) {
+                            if (bi != null) banner = ImageIO.read(bi);
+                        } catch (Exception ignored) {}
+                        themes.put(id, new ThemeDefinition(id, displayName, light, dark, banner));
+                    } catch (Exception e) {
+                        System.err.println("[ThemeManager] Erreur thème embarqué '" + id + "': " + e.getMessage());
+                    }
+                });
+        } catch (Exception e) {
+            System.err.println("[ThemeManager] Erreur lecture /themes/index.txt: " + e.getMessage());
+        }
+    }
+
+    // ── Thèmes externes dans ~/.zokkymon/themes/ (priorité sur les embarqués) ─
 
     private void loadExternalThemes() {
         if (!themesDir.isDirectory()) return;
@@ -97,11 +129,14 @@ public class ThemeManager {
 
             if ("default".equals(id)) {
                 // Cas spécial : permet de surcharger uniquement la bannière du thème par défaut
-                File banner = new File(dir, "banner.png");
-                if (banner.exists()) {
-                    ThemeDefinition def = themes.get("default");
-                    themes.put("default", new ThemeDefinition(
-                        def.id, def.displayName, def.light, def.dark, banner));
+                File bannerF = new File(dir, "banner.png");
+                if (bannerF.exists()) {
+                    try {
+                        BufferedImage banner = ImageIO.read(bannerF);
+                        ThemeDefinition def = themes.get("default");
+                        themes.put("default", new ThemeDefinition(
+                            def.id, def.displayName, def.light, def.dark, banner));
+                    } catch (Exception ignored) {}
                 }
                 continue;
             }
@@ -115,9 +150,12 @@ public class ThemeManager {
                 String displayName = obj.optString("displayName", id);
                 Color[] light = parsePalette(obj.getJSONObject("light"));
                 Color[] dark  = parsePalette(obj.getJSONObject("dark"));
+                BufferedImage banner = null;
                 File bannerFile = new File(dir, "banner.png");
-                if (!bannerFile.exists()) bannerFile = null;
-                themes.put(id, new ThemeDefinition(id, displayName, light, dark, bannerFile));
+                if (bannerFile.exists()) {
+                    try { banner = ImageIO.read(bannerFile); } catch (Exception ignored) {}
+                }
+                themes.put(id, new ThemeDefinition(id, displayName, light, dark, banner));
             } catch (Exception e) {
                 System.err.println("[ThemeManager] Erreur chargement thème '" + id + "': " + e.getMessage());
             }
@@ -170,50 +208,15 @@ public class ThemeManager {
     }
 
     /**
-     * Synchronise en sens unique les thèmes depuis {@code sourceDir}
-     * (ex : {@code config/themes/} à côté de l'exe) vers {@code themesDir} ({@code ~/.zokkymon/themes/}).
-     *
-     * <p>Copie uniquement les fichiers manquants ou dont la source est plus récente.
-     * Appelle {@link #reload()} si au moins un fichier a été modifié ou ajouté.</p>
-     *
-     * @param sourceDir répertoire source contenant des sous-dossiers de thèmes
-     */
-    public void syncFromSourceDir(File sourceDir) {
-        if (sourceDir == null || !sourceDir.isDirectory()) return;
-        File[] subDirs = sourceDir.listFiles(File::isDirectory);
-        if (subDirs == null) return;
-        boolean changed = false;
-        for (File srcThemeDir : subDirs) {
-            File dstThemeDir = new File(themesDir, srcThemeDir.getName());
-            File[] srcFiles  = srcThemeDir.listFiles(File::isFile);
-            if (srcFiles == null) continue;
-            for (File srcFile : srcFiles) {
-                File dstFile = new File(dstThemeDir, srcFile.getName());
-                if (!dstFile.exists() || srcFile.lastModified() > dstFile.lastModified()) {
-                    try {
-                        dstThemeDir.mkdirs();
-                        Files.copy(srcFile.toPath(), dstFile.toPath(),
-                            StandardCopyOption.REPLACE_EXISTING,
-                            StandardCopyOption.COPY_ATTRIBUTES);
-                        changed = true;
-                    } catch (Exception e) {
-                        System.err.println("[ThemeManager] Erreur sync '" + srcFile.getName() + "': " + e.getMessage());
-                    }
-                }
-            }
-        }
-        if (changed) reload();
-    }
-
-    /**
-     * Recharge tous les thèmes externes (utile si l'utilisateur a ajouté ou modifié
-     * un thème dans ~/.zokkymon/themes/ pendant que le launcher tourne).
+     * Recharge tous les thèmes (embarqués + externes) — utile si l'utilisateur
+     * a ajouté un thème dans ~/.zokkymon/themes/ pendant que le launcher tourne.
      * Le thème actif est restauré si toujours disponible, sinon remis à "default".
      */
     public void reload() {
         String savedId = activeId;
         themes.clear();
         addBuiltinDefault();
+        loadBuiltinThemesFromClasspath();
         loadExternalThemes();
         activeId = themes.containsKey(savedId) ? savedId : "default";
     }

@@ -1,7 +1,7 @@
 package com.zokkymon.launcher;
 
 import java.awt.Color;
-import java.io.File;
+import java.awt.image.BufferedImage;
 
 /**
  * Définition d'un thème du launcher.
@@ -43,18 +43,18 @@ public class ThemeDefinition {
     public final Color[] dark;
 
     /**
-     * Fichier bannière PNG propre à ce thème, ou {@code null} pour utiliser
-     * la bannière intégrée au JAR ({@code /banniere.png}).
+     * Bannière PNG propre à ce thème (chargée à la construction),
+     * ou {@code null} pour utiliser la bannière intégrée au JAR ({@code /banniere.png}).
      */
-    public final File bannerFile;
+    public final BufferedImage banner;
 
     public ThemeDefinition(String id, String displayName,
-                           Color[] light, Color[] dark, File bannerFile) {
+                           Color[] light, Color[] dark, BufferedImage banner) {
         this.id          = id;
         this.displayName = displayName;
         this.light       = light;
         this.dark        = dark;
-        this.bannerFile  = bannerFile;
+        this.banner      = banner;
     }
 
     @Override
