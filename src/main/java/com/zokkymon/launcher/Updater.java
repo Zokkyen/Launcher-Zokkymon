@@ -260,10 +260,6 @@ public class Updater {
      * Utilise {@link ZipFile} (accès aléatoire) pour connaître le nombre d'entrées
      * immédiatement via {@code size()}, sans double passe.
      */
-    private void extractZip(File zipFile, File extractDir) throws IOException {
-        extractZip(zipFile, extractDir, 0, 100);
-    }
-
     private void extractZip(File zipFile, File extractDir, int lo, int hi) throws IOException {
         extractDir.mkdirs();
         try (ZipFile zf = new ZipFile(zipFile)) {
