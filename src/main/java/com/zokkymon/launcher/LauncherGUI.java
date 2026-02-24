@@ -1428,23 +1428,16 @@ public class LauncherGUI extends JFrame {
         panel.add(lblPath, c);
         c.gridx = 1; c.fill = GridBagConstraints.HORIZONTAL; c.weightx = 1;
 
-        JTextField fPath = new JTextField(config.getInstallPath(), 22) {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(CARD_BG);
-                g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 10, 10);
-                g2.setColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80));
-                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 10, 10);
-                g2.dispose();
-                super.paintComponent(g);
-            }
-        };
-        fPath.setOpaque(false);
+        JTextField fPath = new JTextField(config.getInstallPath(), 22);
+        fPath.setOpaque(true);
         fPath.setBackground(CARD_BG);
         fPath.setForeground(TEXT);
         fPath.setCaretColor(TEXT);
-        fPath.setBorder(new EmptyBorder(4, 8, 4, 8));
+        fPath.putClientProperty("JComponent.roundRect", true);
+        fPath.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 100), 1),
+            new EmptyBorder(4, 8, 4, 8)
+        ));
 
         JButton browse = mkButton("Parcourir", CARD_BG, TEXT, 10, 28);
         browse.addActionListener(e -> {
@@ -1493,8 +1486,7 @@ public class LauncherGUI extends JFrame {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 int w = getWidth(), h = getHeight(), r = h;
-                g2.setColor(BG);
-                g2.fillRect(0, 0, w, h);
+                // Pas de fillRect: le composant est opaque=false, le fond du parent transparaît
                 Color inactiveTrack = CARD_BG;
                 Color track = darkState[0] ? ACCENT : inactiveTrack;
                 g2.setColor(track);
@@ -1580,8 +1572,13 @@ public class LauncherGUI extends JFrame {
             lblTheme.setForeground(TEXT);
             switchLbl.setForeground(TEXT);
             // Champ chemin
+            fPath.setBackground(CARD_BG);
             fPath.setForeground(TEXT);
             fPath.setCaretColor(TEXT);
+            fPath.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 100), 1),
+                new EmptyBorder(4, 8, 4, 8)
+            ));
             // Boutons
             btnOk.setBackground(ACCENT);
             btnOk.setForeground(BG);
