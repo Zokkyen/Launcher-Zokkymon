@@ -1558,7 +1558,7 @@ public class LauncherGUI extends JFrame {
         Runnable[] refreshDialog = {null};
 
         // Mode — libellé (déclaré avant le listener du switch)
-        JLabel switchLbl = new JLabel(darkState[0] ? " Mode clair" : " Mode sombre");
+        JLabel switchLbl = new JLabel(darkState[0] ? " Sombre" : " Lumineux");
         switchLbl.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         switchLbl.setForeground(TEXT);
 
@@ -1611,7 +1611,7 @@ public class LauncherGUI extends JFrame {
             darkState[0] = !darkState[0];
             themeSwitch.repaint();
             // Mettre à jour le label AVANT refreshDialog (qui reconstruit le panel)
-            switchLbl.setText(darkState[0] ? " Mode clair" : " Mode sombre");
+            switchLbl.setText(darkState[0] ? " Sombre" : " Lumineux");
             // Aperçu live sans sauvegarder
             rebuildUI(darkState[0]);
             // Rafraîchit aussi les couleurs du dialog
