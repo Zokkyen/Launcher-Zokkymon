@@ -1432,6 +1432,7 @@ public class LauncherGUI extends JFrame {
             @Override public Color getBackground() { return CARD_BG; }
             @Override public Color getForeground()  { return TEXT; }
         };
+        fPath.setUI(new javax.swing.plaf.basic.BasicTextFieldUI());
         fPath.setOpaque(true);
         fPath.setForeground(TEXT);
         fPath.setCaretColor(TEXT);
