@@ -1,6 +1,6 @@
 # Zokkymon Launcher — Branche `beta`
 
-Launcher Java/Swing pour Minecraft Fabric, avec mise à jour automatique du modpack, authentification Microsoft et système de thèmes.
+Launcher Java/Swing pour Minecraft Fabric, avec mise à jour automatique du modpack, authentification Microsoft et interface thémable clair/sombre.
 
 > Cette branche est la branche de développement actif.  
 > Les releases stables sont publiées sur `main`.
@@ -11,10 +11,10 @@ Launcher Java/Swing pour Minecraft Fabric, avec mise à jour automatique du modp
 
 - Authentification Microsoft (Device Code Flow → Xbox → XSTS → Minecraft)
 - Vérification et téléchargement automatique du modpack (SHA-256)
+- Progression unifiée 0→100 % : téléchargement (0–60 %) puis extraction (60–100 %)
 - Mise à jour automatique du launcher via `info.json` hébergé sur GitHub
-- Interface Swing entièrement peinte à la main (pas de look-and-feel natif)
-- Système de thèmes JSON dynamiques (clair/sombre par thème)
-- Stockage chiffré des tokens MSA (AES-256-GCM, clé machine-locale PKCS12)
+- Interface Swing entièrement peinte à la main (pas de look-and-feel natif), palette clair/sombre
+- Stockage chiffré des tokens MSA **et** du token modpack (AES-256-GCM, clé machine-locale PKCS12)
 - Configuration par fichier JSON externe (non embarqué dans le JAR)
 
 ---
@@ -42,17 +42,12 @@ ZokkymonLauncher/
 │   ├── UpdaterService.java     # Orchestration des mises à jour
 │   ├── ConfigManager.java      # Lecture/écriture config JSON + profil MSA
 │   ├── MicrosoftAuth.java      # Flux d'auth Microsoft Device Code
-│   ├── SecureStorage.java      # Chiffrement AES-256-GCM des tokens
-│   ├── ThemeManager.java       # Chargement et activation des thèmes
-│   └── ThemeDefinition.java    # Modèle d'un thème (couleurs clair + sombre)
+│   └── SecureStorage.java      # Chiffrement AES-256-GCM des tokens
 ├── src/main/resources/
-│   └── launcher_config.json    # Config embarquée dans le JAR (sans secrets)
+│   └── launcher_config.json    # Config embarquée dans le JAR (sans secrets MSA)
 ├── config/
 │   ├── launcher_config.json    # Config locale (ignorée par git, contient les secrets)
-│   ├── version.json.example    # Format du fichier version du modpack
-│   └── themes/
-│       ├── default/theme.json  # Thème Zokkymon (défaut)
-│       └── contraste/theme.json
+│   └── version.json.example    # Format du fichier version du modpack
 ├── info.json                   # Version + URL + SHA256 du dernier EXE publié
 ├── .github/workflows/
 │   └── update-info.yml         # Met à jour info.json automatiquement à la release
@@ -80,7 +75,6 @@ Copier `config/launcher_config.json` depuis la config embarquée et remplir les 
 ```json
 {
   "msaClientId":       "<Azure App Registration Client ID>",
-  "modpackToken":      "<token d'accès au modpack>",
   "modpackInfoUrl":    "<URL du info.json du modpack>",
   "launcherInfoUrl":   "<URL du info.json du launcher>",
   "installPath":       "",
@@ -90,21 +84,16 @@ Copier `config/launcher_config.json` depuis la config embarquée et remplir les 
 
 > `config/launcher_config.json` est dans le `.gitignore`. Ne jamais committer ce fichier.
 
----
-
-## Thèmes
-
-Les thèmes sont des fichiers JSON dans `~/.zokkymon/themes/<id>/theme.json`.  
-Chaque thème déclare deux palettes (`light` / `dark`) avec les clés :
-`bg`, `cardBg`, `sidebar1`, `sidebar2`, `console`, `accent`, `warning`, `danger`, `text`, `textDim`, `btm1`, `btm2`.
+> Le `modpackToken` est déjà embarqué dans le JAR. Il est automatiquement chiffré avec la clé machine dès le premier lancement (voir section Sécurité).
 
 ---
 
 ## Sécurité
 
-- Les tokens MSA sont chiffrés sur disque via `SecureStorage` (AES-256-GCM).
-- La clé est dérivée de `SHA-256(username@hostname)` et stockée dans un KeyStore PKCS12 local (`~/.zokkymon/config/.ks`).
-- Le `msaClientId` n'est pas embarqué dans le JAR — il est lu depuis la config locale uniquement.
+- Les tokens **MSA** (access + refresh) sont chiffrés sur disque via `SecureStorage` (AES-256-GCM).
+- Le **token modpack** suit le même mécanisme : stocké en clair dans le JAR à la distribution, puis chiffré automatiquement sur le poste de l'utilisateur dès la première lecture.
+- La clé de chiffrement est dérivée de `SHA-256(username@hostname)` et stockée dans un KeyStore PKCS12 local (`~/.zokkymon/config/.ks`). Elle est propre à chaque machine/profil.
+- Le `msaClientId` n'est pas embarqué dans le JAR — il doit être renseigné dans la config locale uniquement.
 
 ---
 
@@ -128,4 +117,3 @@ Au démarrage, le launcher compare `launcherVersion` (config) avec `info.json` d
 |---|---|
 | `main` | Releases stables |
 | `beta` | Développement — pre-releases |
-
