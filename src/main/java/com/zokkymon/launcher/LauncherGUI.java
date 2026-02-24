@@ -1610,14 +1610,13 @@ public class LauncherGUI extends JFrame {
         themeSwitch.addActionListener(e -> {
             darkState[0] = !darkState[0];
             themeSwitch.repaint();
+            // Mettre à jour le label AVANT refreshDialog (qui reconstruit le panel)
+            switchLbl.setText(darkState[0] ? " Mode clair" : " Mode sombre");
             // Aperçu live sans sauvegarder
             rebuildUI(darkState[0]);
             // Rafraîchit aussi les couleurs du dialog
             if (refreshDialog[0] != null) refreshDialog[0].run();
         });
-
-        // Met à jour le libellé du switch quand on bascule
-        themeSwitch.addActionListener(e -> switchLbl.setText(darkState[0] ? " Mode clair" : " Mode sombre"));
 
         JPanel switchRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         switchRow.setOpaque(false);
