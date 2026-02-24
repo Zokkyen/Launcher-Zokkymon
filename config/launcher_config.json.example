@@ -2,7 +2,7 @@
   "modpackInfoUrl": "https://votre-serveur.com/modpack/info.json",
   "installPath": "",
   "enableVersionCheck": true,
-  "launcherVersion": "0.0.5",
+  "launcherVersion": "0.2.0",
   "serverUrl": "https://votre-serveur.com",
   "launcherInfoUrl": "https://raw.githubusercontent.com/VotreOrg/VotreRepo/main/info.json",
   "modpackName": "VotreModpack",
