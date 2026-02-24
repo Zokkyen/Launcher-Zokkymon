@@ -59,9 +59,11 @@ L’objectif est de garantir :
 
 - Installation automatique de Java
 - Installation de Fabric
-- Téléchargement automatique du modpack
-- Vérification des mises à jour
-- Interface personnalisée
+- Téléchargement et mise à jour automatiques du modpack (vérification SHA-256)
+- Progression unifiée lors du téléchargement et de l'extraction
+- Authentification officielle Microsoft / Minecraft
+- Interface en mode **clair** ou **sombre** (bascule intégrée)
+- Stockage sécurisé des tokens (chiffrement AES-256-GCM)
 
 ---
 
