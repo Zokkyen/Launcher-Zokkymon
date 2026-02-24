@@ -699,6 +699,7 @@ public class LauncherGUI extends JFrame {
             copyBtn.addActionListener(ev -> {
                 java.awt.Toolkit.getDefaultToolkit().getSystemClipboard()
                     .setContents(new java.awt.datatransfer.StringSelection(dcr.userCode), null);
+                copyBtn.setFont(new Font("Segoe UI Symbol", Font.PLAIN, 12));
                 copyBtn.setText("\u2713 Copié !");
             });
             openBtn.addActionListener(ev -> {
@@ -1479,12 +1480,16 @@ public class LauncherGUI extends JFrame {
                 // Effacer d'abord avec la couleur du fond du dialog pour éviter les artefacts FlatLaf
                 g2.setColor(CONSOLE_BG);
                 g2.fillRect(0, 0, w, h);
-                // Fond du switch — couleurs du thème actif
-                Color track = darkState[0] ? SIDEBAR1 : SIDEBAR2;
+                // Piste : ACCENT quand actif (mode sombre), gris neutre fixe quand inactif
+                // → évite la confusion avec SIDEBAR1/SIDEBAR2 qui peuvent égaler CONSOLE_BG
+                Color track = darkState[0] ? ACCENT : new Color(140, 140, 140);
                 g2.setColor(track);
                 g2.fillRoundRect(0, 0, w, h, r, r);
-                // Icône thème — accent du thème actif
-                g2.setColor(ACCENT);
+                // Luminance perçue de la piste (formule BT.601) pour choisir le contraste icône/pastille
+                int lum = (track.getRed() * 299 + track.getGreen() * 587 + track.getBlue() * 114) / 1000;
+                Color onTrack = lum > 160 ? new Color(30, 30, 30) : Color.WHITE;
+                // Icône thème
+                g2.setColor(onTrack);
                 g2.setFont(new Font("Segoe UI Symbol", Font.PLAIN, 11));
                 String icon = darkState[0] ? "☽" : "☀";
                 FontMetrics fm = g2.getFontMetrics();
@@ -1494,9 +1499,9 @@ public class LauncherGUI extends JFrame {
                 } else {
                     g2.drawString(icon, w - fm.stringWidth(icon) - 6, ty);
                 }
-                // Pastille blanche
+                // Pastille — couleur contrastante calculée selon la luminance de la piste
                 int knobX = darkState[0] ? w - h + 3 : 3;
-                g2.setColor(Color.WHITE);
+                g2.setColor(onTrack);
                 g2.fillOval(knobX, 3, h - 6, h - 6);
                 g2.dispose();
             }
