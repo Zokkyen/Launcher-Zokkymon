@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="banniere.png" alt="Zokkymon Banner" width="800"/>
+  <img src="launcher.png" alt="Zokkymon Banner" width="800"/>
 </p>
 
 <h1 align="center">Launcher Zokkymon</h1>
