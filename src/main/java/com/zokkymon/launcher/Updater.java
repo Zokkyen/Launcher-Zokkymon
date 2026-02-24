@@ -137,7 +137,6 @@ public class Updater {
             File installedDir = new File(installDir, "zokkymon_v" + installedVer);
             if (!installedDir.exists()) {
                 gui.appendLog("[!] Dossier modpack manquant: " + installedDir.getName());
-                config.setModpackVersion("");   // réinitialiser
                 return "absent";
             }
 
@@ -162,13 +161,9 @@ public class Updater {
                 return "absent";
             }
 
-            // Détecter la version depuis le nom du dossier et la sauvegarder si absente
+            // Détecter la version depuis le nom du dossier
             java.util.Arrays.sort(modpackDirs);
             String detectedVer = modpackDirs[modpackDirs.length - 1].getName().replace("zokkymon_v", "");
-            if (!detectedVer.equals(config.getModpackVersion())) {
-                config.setModpackVersion(detectedVer);
-                gui.appendLog("[*] Version installée détectée et enregistrée: " + detectedVer);
-            }
             gui.appendLog("[OK] Modpack v" + detectedVer + " présent localement");
             return "uptodate";
         }
@@ -232,7 +227,7 @@ public class Updater {
 
                 // Enregistrer la version installée dans launcher_config.json
                 config.setModpackVersion(version);
-                gui.appendLog("[*] Version installée enregistrée: " + version);
+                gui.appendLog("[*] Modpack v" + version + " installé");
 
                 gui.appendLog("[OK] Modpack v" + version + " téléchargé et extrait avec succès!");
                 return true;
