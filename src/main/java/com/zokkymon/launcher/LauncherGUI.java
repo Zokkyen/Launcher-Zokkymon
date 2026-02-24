@@ -1480,9 +1480,14 @@ public class LauncherGUI extends JFrame {
                 // Effacer d'abord avec la couleur du fond du dialog pour éviter les artefacts FlatLaf
                 g2.setColor(CONSOLE_BG);
                 g2.fillRect(0, 0, w, h);
-                // Piste : ACCENT quand actif (mode sombre), gris neutre fixe quand inactif
-                // → évite la confusion avec SIDEBAR1/SIDEBAR2 qui peuvent égaler CONSOLE_BG
-                Color track = darkState[0] ? ACCENT : new Color(140, 140, 140);
+                // Piste : ACCENT quand actif (mode sombre),
+                // mélange CONSOLE_BG+ACCENT quand inactif → couleur thème sans gris parasite
+                Color inactiveTrack = new Color(
+                    (CONSOLE_BG.getRed()   + ACCENT.getRed())   / 2,
+                    (CONSOLE_BG.getGreen() + ACCENT.getGreen()) / 2,
+                    (CONSOLE_BG.getBlue()  + ACCENT.getBlue())  / 2
+                );
+                Color track = darkState[0] ? ACCENT : inactiveTrack;
                 g2.setColor(track);
                 g2.fillRoundRect(0, 0, w, h, r, r);
                 // Luminance perçue de la piste (formule BT.601) pour choisir le contraste icône/pastille
