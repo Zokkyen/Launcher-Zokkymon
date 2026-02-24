@@ -295,10 +295,12 @@ public class LauncherGUI extends JFrame {
                     g2.fillRect(0, 0, w, h);
                 }
                 
-                // Overlay teinté BG — s'adapte au thème clair/sombre et reste léger
-                int overlayAlpha = (BG.getRed() + BG.getGreen() + BG.getBlue()) < 200 ? 110 : 55;
-                g2.setColor(new Color(BG.getRed(), BG.getGreen(), BG.getBlue(), overlayAlpha));
-                g2.fillRect(0, 0, w, h);
+                // Overlay uniquement en mode sombre, très léger — en mode clair : aucun filtre
+                boolean isDark = (BG.getRed() + BG.getGreen() + BG.getBlue()) < 200;
+                if (isDark) {
+                    g2.setColor(new Color(BG.getRed(), BG.getGreen(), BG.getBlue(), 55));
+                    g2.fillRect(0, 0, w, h);
+                }
                 g2.dispose();
             }
         };
@@ -338,7 +340,7 @@ public class LauncherGUI extends JFrame {
             bannerImg = t.banner;
             return;
         }
-        bannerImg = loadImage("/banniere.png", "/banniere.jpg", "/zokkymon.png");
+        bannerImg = loadImage("/banner.png", "/zokkymon.png");
     }
 
     // ── Sidebar ──────────────────────────────────────────────────────────────
