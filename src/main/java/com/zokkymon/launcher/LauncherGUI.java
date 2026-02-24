@@ -148,8 +148,8 @@ public class LauncherGUI extends JFrame {
         logArea = new JTextArea();
         logArea.setEditable(false);
         logArea.setFont(FONT_MONO);
-        logArea.setBackground(new Color(20, 20, 25)); // Fond sombre neutre pour les logs
-        logArea.setForeground(new Color(220, 220, 220));
+        logArea.setBackground(CONSOLE_BG);
+        logArea.setForeground(TEXT);
         logArea.setLineWrap(true);
         logArea.setWrapStyleWord(true);
         logArea.setBorder(new EmptyBorder(8, 10, 8, 10));
@@ -157,7 +157,7 @@ public class LauncherGUI extends JFrame {
 
         logScrollPane = new JScrollPane(logArea);
         logScrollPane.setBorder(BorderFactory.createLineBorder(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80), 1));
-        logScrollPane.getViewport().setBackground(new Color(20, 20, 25));
+        logScrollPane.getViewport().setBackground(CONSOLE_BG);
     }
 
     private void startBackgroundChecks() {
@@ -245,6 +245,11 @@ public class LauncherGUI extends JFrame {
         String savedLog = logArea != null ? logArea.getText() : "";
         applyTheme(dark);
         loadBannerForCurrentTheme();
+        if (logArea != null) {
+            logArea.setBackground(CONSOLE_BG);
+            logArea.setForeground(TEXT);
+            logScrollPane.getViewport().setBackground(CONSOLE_BG);
+        }
         
         JPanel root = buildRootPanel();
         setContentPane(root);
@@ -1067,11 +1072,11 @@ public class LauncherGUI extends JFrame {
         dialog.setLocationRelativeTo(this);
         
         JPanel cp = new JPanel(new BorderLayout());
-        cp.setBackground(new Color(20, 20, 25));
+        cp.setBackground(BG);
         cp.setBorder(new EmptyBorder(10, 10, 10, 10));
         cp.add(logScrollPane, BorderLayout.CENTER);
         
-        JButton closeBtn = mkButton("Fermer", new Color(50, 50, 55), Color.WHITE, 12, 34);
+        JButton closeBtn = mkButton("Fermer", CARD_BG, TEXT, 12, 34);
         closeBtn.addActionListener(e -> dialog.dispose());
         
         JPanel bp = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 10));
@@ -1338,7 +1343,7 @@ public class LauncherGUI extends JFrame {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(new Color(30, 30, 35));
+                g2.setColor(CARD_BG);
                 g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 16, 16);
                 g2.dispose();
             }
@@ -1346,9 +1351,9 @@ public class LauncherGUI extends JFrame {
         panel.setOpaque(false);
         panel.setBorder(new EmptyBorder(16, 16, 16, 16));
 
-        UIManager.put("OptionPane.background",        new Color(30, 30, 35));
-        UIManager.put("Panel.background",             new Color(30, 30, 35));
-        UIManager.put("OptionPane.messageForeground", Color.WHITE);
+        UIManager.put("OptionPane.background",        BG);
+        UIManager.put("Panel.background",             BG);
+        UIManager.put("OptionPane.messageForeground", TEXT);
 
         GridBagConstraints c = new GridBagConstraints();
         c.insets = new Insets(7, 7, 7, 7);
@@ -1360,7 +1365,7 @@ public class LauncherGUI extends JFrame {
         c.gridx = 1;
         JComboBox<String> cRam = new JComboBox<>(new String[]{"2 Go","4 Go","6 Go","8 Go","10 Go","12 Go","14 Go","16 Go"});
         cRam.setSelectedItem(config.getRamAllocation());
-        cRam.setForeground(Color.WHITE);
+        cRam.setForeground(TEXT);
         cRam.setBorder(BorderFactory.createLineBorder(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80), 1));
         cRam.setUI(new javax.swing.plaf.basic.BasicComboBoxUI() {
             @Override
@@ -1369,7 +1374,7 @@ public class LauncherGUI extends JFrame {
                     @Override protected void paintComponent(Graphics g) {
                         Graphics2D g2 = (Graphics2D) g.create();
                         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                        g2.setColor(new Color(40, 40, 45));
+                        g2.setColor(CARD_BG);
                         g2.fillRect(0, 0, getWidth(), getHeight());
                         g2.setColor(ACCENT);
                         int cx = getWidth() / 2, cy = getHeight() / 2;
@@ -1387,11 +1392,11 @@ public class LauncherGUI extends JFrame {
             @Override
             public void installUI(JComponent c) {
                 super.installUI(c);
-                comboBox.setBackground(new Color(40, 40, 45));
+                comboBox.setBackground(CARD_BG);
             }
             @Override
             public void paintCurrentValueBackground(Graphics g, Rectangle bounds, boolean hasFocus) {
-                g.setColor(new Color(40, 40, 45));
+                g.setColor(CARD_BG);
                 g.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
             }
             @Override
@@ -1399,8 +1404,8 @@ public class LauncherGUI extends JFrame {
                 ListCellRenderer<Object> renderer = comboBox.getRenderer();
                 Component comp = renderer.getListCellRendererComponent(
                         listBox, comboBox.getSelectedItem(), -1, false, false);
-                comp.setBackground(new Color(40, 40, 45));
-                comp.setForeground(Color.WHITE);
+                comp.setBackground(CARD_BG);
+                comp.setForeground(TEXT);
                 currentValuePane.paintComponent(g, comp, comboBox,
                         bounds.x, bounds.y, bounds.width, bounds.height, false);
             }
@@ -1410,8 +1415,8 @@ public class LauncherGUI extends JFrame {
             public Component getListCellRendererComponent(JList<?> list, Object value,
                     int index, boolean isSelected, boolean cellHasFocus) {
                 JLabel lbl = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-                lbl.setBackground(isSelected ? new Color(60, 60, 65) : new Color(40, 40, 45));
-                lbl.setForeground(isSelected ? ACCENT : Color.WHITE);
+                lbl.setBackground(isSelected ? SIDEBAR1 : CARD_BG);
+                lbl.setForeground(isSelected ? ACCENT : TEXT);
                 lbl.setBorder(new EmptyBorder(4, 10, 4, 10));
                 return lbl;
             }
@@ -1427,7 +1432,7 @@ public class LauncherGUI extends JFrame {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(new Color(40, 40, 45));
+                g2.setColor(CARD_BG);
                 g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 10, 10);
                 g2.setColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80));
                 g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 10, 10);
@@ -1436,12 +1441,12 @@ public class LauncherGUI extends JFrame {
             }
         };
         fPath.setOpaque(false);
-        fPath.setBackground(new Color(40, 40, 45));
-        fPath.setForeground(Color.WHITE);
-        fPath.setCaretColor(Color.WHITE);
+        fPath.setBackground(CARD_BG);
+        fPath.setForeground(TEXT);
+        fPath.setCaretColor(TEXT);
         fPath.setBorder(new EmptyBorder(4, 8, 4, 8));
 
-        JButton browse = mkButton("Parcourir", new Color(50, 50, 55), Color.WHITE, 10, 28);
+        JButton browse = mkButton("Parcourir", CARD_BG, TEXT, 10, 28);
         browse.addActionListener(e -> {
             JFileChooser fc = new JFileChooser();
             fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
@@ -1481,16 +1486,16 @@ public class LauncherGUI extends JFrame {
 
         JLabel switchLbl = new JLabel(darkState[0] ? " Sombre" : " Lumineux");
         switchLbl.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        switchLbl.setForeground(Color.WHITE);
+        switchLbl.setForeground(TEXT);
 
         JToggleButton themeSwitch = new JToggleButton() {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 int w = getWidth(), h = getHeight(), r = h;
-                g2.setColor(new Color(30, 30, 35));
+                g2.setColor(BG);
                 g2.fillRect(0, 0, w, h);
-                Color inactiveTrack = new Color(50, 50, 55);
+                Color inactiveTrack = CARD_BG;
                 Color track = darkState[0] ? ACCENT : inactiveTrack;
                 g2.setColor(track);
                 g2.fillRoundRect(0, 0, w, h, r, r);
@@ -1543,7 +1548,7 @@ public class LauncherGUI extends JFrame {
         dialog.setResizable(false);
 
         JButton btnOk     = mkButton("OK", ACCENT, BG, 10, 32);
-        JButton btnCancel = mkButton("Annuler", new Color(50, 50, 55), Color.WHITE, 10, 32);
+        JButton btnCancel = mkButton("Annuler", CARD_BG, TEXT, 10, 32);
         btnOk    .setPreferredSize(new Dimension(90, 32));
         btnCancel.setPreferredSize(new Dimension(90, 32));
 
@@ -1557,13 +1562,14 @@ public class LauncherGUI extends JFrame {
         btnRow.add(btnCancel);
 
         JPanel wrapper = new JPanel(new BorderLayout(0, 12));
-        wrapper.setBackground(new Color(20, 20, 25));
+        wrapper.setBackground(BG);
         wrapper.setBorder(new EmptyBorder(4, 4, 12, 4));
         wrapper.add(panel,  BorderLayout.CENTER);
         wrapper.add(btnRow, BorderLayout.SOUTH);
 
         refreshDialog[0] = () -> {
-            wrapper.setBackground(new Color(20, 20, 25));
+            wrapper.setBackground(BG);
+            panel.repaint();
             dialog.repaint();
         };
 
@@ -1665,7 +1671,7 @@ public class LauncherGUI extends JFrame {
     private JLabel settingsLbl(String text) {
         JLabel l = new JLabel(text);
         l.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        l.setForeground(Color.WHITE);
+        l.setForeground(TEXT);
         return l;
     }
 
@@ -1683,7 +1689,7 @@ public class LauncherGUI extends JFrame {
 
     private JComboBox<ThemeDefinition> buildThemeCombo(java.util.List<ThemeDefinition> themeList) {
         JComboBox<ThemeDefinition> combo = new JComboBox<>(themeList.toArray(new ThemeDefinition[0]));
-        combo.setForeground(Color.WHITE);
+        combo.setForeground(TEXT);
         combo.setBorder(BorderFactory.createLineBorder(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80), 1));
         combo.setUI(new javax.swing.plaf.basic.BasicComboBoxUI() {
             @Override
@@ -1692,7 +1698,7 @@ public class LauncherGUI extends JFrame {
                     @Override protected void paintComponent(Graphics g) {
                         Graphics2D g2 = (Graphics2D) g.create();
                         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                        g2.setColor(new Color(40, 40, 45));
+                        g2.setColor(CARD_BG);
                         g2.fillRect(0, 0, getWidth(), getHeight());
                         g2.setColor(ACCENT);
                         int cx = getWidth() / 2, cy = getHeight() / 2;
@@ -1710,11 +1716,11 @@ public class LauncherGUI extends JFrame {
             @Override
             public void installUI(JComponent c) {
                 super.installUI(c);
-                comboBox.setBackground(new Color(40, 40, 45));
+                comboBox.setBackground(CARD_BG);
             }
             @Override
             public void paintCurrentValueBackground(Graphics g, Rectangle bounds, boolean hasFocus) {
-                g.setColor(new Color(40, 40, 45));
+                g.setColor(CARD_BG);
                 g.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
             }
             @Override
@@ -1722,8 +1728,8 @@ public class LauncherGUI extends JFrame {
                 ListCellRenderer<Object> renderer = comboBox.getRenderer();
                 Component c2 = renderer.getListCellRendererComponent(
                         listBox, comboBox.getSelectedItem(), -1, false, false);
-                c2.setBackground(new Color(40, 40, 45));
-                c2.setForeground(Color.WHITE);
+                c2.setBackground(CARD_BG);
+                c2.setForeground(TEXT);
                 currentValuePane.paintComponent(g, c2, comboBox,
                         bounds.x, bounds.y, bounds.width, bounds.height, false);
             }
@@ -1733,8 +1739,8 @@ public class LauncherGUI extends JFrame {
             public Component getListCellRendererComponent(JList<?> list, Object value,
                     int index, boolean isSelected, boolean cellHasFocus) {
                 JLabel lbl = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-                lbl.setBackground(isSelected ? new Color(60, 60, 65) : new Color(40, 40, 45));
-                lbl.setForeground(isSelected ? ACCENT : Color.WHITE);
+                lbl.setBackground(isSelected ? SIDEBAR1 : CARD_BG);
+                lbl.setForeground(isSelected ? ACCENT : TEXT);
                 lbl.setBorder(new EmptyBorder(4, 10, 4, 10));
                 return lbl;
             }
