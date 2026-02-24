@@ -25,28 +25,38 @@ public class LauncherGUI extends JFrame {
     @java.io.Serial
     private static final long serialVersionUID = 1L;
 
-    // ── Gestionnaire de thèmes ────────────────────────────────────────────────
-    static ThemeManager themeManager;
-
     // ── Couleurs actives (mises à jour par applyTheme) ───────────────────────
     static Color BG, CARD_BG, SIDEBAR1, SIDEBAR2, CONSOLE_BG,
                  ACCENT, WARNING, DANGER, TEXT, TEXT_DIM, BTM1, BTM2;
 
     static void applyTheme(boolean dark) {
-        ThemeDefinition t = themeManager.getCurrent();
-        Color[] p = dark ? t.dark : t.light;
-        BG         = p[ThemeDefinition.IDX_BG];
-        CARD_BG    = p[ThemeDefinition.IDX_CARD_BG];
-        SIDEBAR1   = p[ThemeDefinition.IDX_SIDEBAR1];
-        SIDEBAR2   = p[ThemeDefinition.IDX_SIDEBAR2];
-        CONSOLE_BG = p[ThemeDefinition.IDX_CONSOLE];
-        ACCENT     = p[ThemeDefinition.IDX_ACCENT];
-        WARNING    = p[ThemeDefinition.IDX_WARNING];
-        DANGER     = p[ThemeDefinition.IDX_DANGER];
-        TEXT       = p[ThemeDefinition.IDX_TEXT];
-        TEXT_DIM   = p[ThemeDefinition.IDX_TEXT_DIM];
-        BTM1       = p[ThemeDefinition.IDX_BTM1];
-        BTM2       = p[ThemeDefinition.IDX_BTM2];
+        if (dark) {
+            BG         = new Color( 10,   0,  21);
+            CARD_BG    = new Color( 20,   4,  36);
+            SIDEBAR1   = new Color( 16,   2,  30);
+            SIDEBAR2   = new Color(  7,   0,  16);
+            CONSOLE_BG = new Color(  5,   0,  12);
+            ACCENT     = new Color(255,   0, 170);
+            WARNING    = new Color(245, 158,  11);
+            DANGER     = new Color(239,  68,  68);
+            TEXT       = new Color(240, 232, 255);
+            TEXT_DIM   = new Color( 98,  72, 130);
+            BTM1       = new Color( 14,   2,  26);
+            BTM2       = new Color(  7,   0,  16);
+        } else {
+            BG         = new Color(245, 240, 255);
+            CARD_BG    = new Color(230, 220, 248);
+            SIDEBAR1   = new Color(218, 206, 242);
+            SIDEBAR2   = new Color(202, 188, 232);
+            CONSOLE_BG = new Color(250, 246, 255);
+            ACCENT     = new Color(180,   0, 140);
+            WARNING    = new Color(172,  90,   0);
+            DANGER     = new Color(190,  25,  25);
+            TEXT       = new Color( 15,   5,  28);
+            TEXT_DIM   = new Color( 98,  80, 128);
+            BTM1       = new Color(220, 210, 240);
+            BTM2       = new Color(205, 194, 228);
+        }
     }
 
     // ── Composants exposés ───────────────────────────────────────────────────
@@ -112,8 +122,6 @@ public class LauncherGUI extends JFrame {
 
         config  = new ConfigManager();
         MicrosoftAuth.setClientId(config.getClientId());
-        themeManager = new ThemeManager(new java.io.File(System.getProperty("user.home"), ".zokkymon"));
-        themeManager.setActiveId(config.getActiveTheme());
         applyTheme(config.isDarkMode());
         updater = new Updater(this, config);
 
@@ -340,11 +348,6 @@ public class LauncherGUI extends JFrame {
     }
 
     private void loadBannerForCurrentTheme() {
-        ThemeDefinition t = themeManager.getCurrent();
-        if (t.banner != null) {
-            bannerImg = t.banner;
-            return;
-        }
         bannerImg = loadImage("/banner.png", "/zokkymon.png");
     }
 
@@ -1463,22 +1466,6 @@ public class LauncherGUI extends JFrame {
         panel.add(pathRow, c);
 
         c.gridx = 0; c.gridy = 2; c.fill = GridBagConstraints.NONE; c.weightx = 0;
-        JLabel lblThemeSelect = settingsLbl("Thème");
-        panel.add(lblThemeSelect, c);
-        c.gridx = 1; c.fill = GridBagConstraints.HORIZONTAL; c.weightx = 1;
-
-        final String[] originalThemeId = {themeManager.getActiveId()};
-        java.util.List<ThemeDefinition> themeList = new java.util.ArrayList<>(themeManager.getAll());
-        JComboBox<ThemeDefinition> cTheme = buildThemeCombo(themeList);
-        for (int ti = 0; ti < themeList.size(); ti++) {
-            if (themeList.get(ti).id.equals(themeManager.getActiveId())) {
-                cTheme.setSelectedIndex(ti);
-                break;
-            }
-        }
-        panel.add(cTheme, c);
-
-        c.gridx = 0; c.gridy = 3; c.fill = GridBagConstraints.NONE; c.weightx = 0;
         JLabel lblTheme = settingsLbl("Mode");
         panel.add(lblTheme, c);
         c.gridx = 1;
@@ -1536,16 +1523,6 @@ public class LauncherGUI extends JFrame {
         switchRow.add(switchLbl);
         panel.add(switchRow, c);
 
-        cTheme.addActionListener(e -> {
-            ThemeDefinition sel = (ThemeDefinition) cTheme.getSelectedItem();
-            if (sel != null && !sel.id.equals(themeManager.getActiveId())) {
-                themeManager.setActiveId(sel.id);
-                applyTheme(darkState[0]);
-                if (refreshDialog[0] != null) refreshDialog[0].run();
-                rebuildUI(darkState[0]);
-            }
-        });
-
         JDialog dialog = new JDialog(this, "Paramètres", true);
         dialog.setUndecorated(false);
         dialog.setResizable(false);
@@ -1579,7 +1556,6 @@ public class LauncherGUI extends JFrame {
             // Labels
             lblRam.setForeground(TEXT);
             lblPath.setForeground(TEXT);
-            lblThemeSelect.setForeground(TEXT);
             lblTheme.setForeground(TEXT);
             switchLbl.setForeground(TEXT);
             // Champ chemin
@@ -1595,7 +1571,6 @@ public class LauncherGUI extends JFrame {
             browse.setForeground(TEXT);
             // Combos
             cRam.setForeground(TEXT);
-            cTheme.setForeground(TEXT);
             // Repaint global
             panel.repaint();
             wrapper.repaint();
@@ -1614,16 +1589,12 @@ public class LauncherGUI extends JFrame {
         if (result[0] == JOptionPane.OK_OPTION) {
             config.setRamAllocation((String) cRam.getSelectedItem());
             config.setInstallPath(fPath.getText());
-            ThemeDefinition selectedTheme = (ThemeDefinition) cTheme.getSelectedItem();
-            if (selectedTheme != null) config.setActiveTheme(selectedTheme.id);
             if (darkState[0] != config.isDarkMode()) config.setDarkMode(darkState[0]);
             appendLog("Paramètres enregistrés.");
             new Thread(this::initInfoCards).start();
         } else {
-            boolean themeChanged = !themeManager.getActiveId().equals(originalThemeId[0]);
-            boolean modeChanged  = darkState[0] != config.isDarkMode();
-            if (themeChanged) themeManager.setActiveId(originalThemeId[0]);
-            if (themeChanged || modeChanged) {
+            boolean modeChanged = darkState[0] != config.isDarkMode();
+            if (modeChanged) {
                 SwingUtilities.invokeLater(() -> rebuildUI(config.isDarkMode()));
             }
         }
@@ -1714,66 +1685,5 @@ public class LauncherGUI extends JFrame {
             if (files != null) for (File f : files) deleteDirectory(f);
         }
         dir.delete();
-    }
-
-    private JComboBox<ThemeDefinition> buildThemeCombo(java.util.List<ThemeDefinition> themeList) {
-        JComboBox<ThemeDefinition> combo = new JComboBox<>(themeList.toArray(new ThemeDefinition[0]));
-        combo.setForeground(TEXT);
-        combo.setBorder(BorderFactory.createLineBorder(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80), 1));
-        combo.setUI(new javax.swing.plaf.basic.BasicComboBoxUI() {
-            @Override
-            protected JButton createArrowButton() {
-                JButton btn = new JButton() {
-                    @Override protected void paintComponent(Graphics g) {
-                        Graphics2D g2 = (Graphics2D) g.create();
-                        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                        g2.setColor(CARD_BG);
-                        g2.fillRect(0, 0, getWidth(), getHeight());
-                        g2.setColor(ACCENT);
-                        int cx = getWidth() / 2, cy = getHeight() / 2;
-                        int[] xp = {cx - 4, cx + 4, cx};
-                        int[] yp = {cy - 2, cy - 2, cy + 3};
-                        g2.fillPolygon(xp, yp, 3);
-                        g2.dispose();
-                    }
-                };
-                btn.setBorder(BorderFactory.createEmptyBorder());
-                btn.setFocusPainted(false);
-                btn.setContentAreaFilled(false);
-                return btn;
-            }
-            @Override
-            public void installUI(JComponent c) {
-                super.installUI(c);
-                comboBox.setBackground(CARD_BG);
-            }
-            @Override
-            public void paintCurrentValueBackground(Graphics g, Rectangle bounds, boolean hasFocus) {
-                g.setColor(CARD_BG);
-                g.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
-            }
-            @Override
-            public void paintCurrentValue(Graphics g, Rectangle bounds, boolean hasFocus) {
-                ListCellRenderer<Object> renderer = comboBox.getRenderer();
-                Component c2 = renderer.getListCellRendererComponent(
-                        listBox, comboBox.getSelectedItem(), -1, false, false);
-                c2.setBackground(CARD_BG);
-                c2.setForeground(TEXT);
-                currentValuePane.paintComponent(g, c2, comboBox,
-                        bounds.x, bounds.y, bounds.width, bounds.height, false);
-            }
-        });
-        combo.setRenderer(new DefaultListCellRenderer() {
-            @Override
-            public Component getListCellRendererComponent(JList<?> list, Object value,
-                    int index, boolean isSelected, boolean cellHasFocus) {
-                JLabel lbl = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-                lbl.setBackground(isSelected ? SIDEBAR1 : CARD_BG);
-                lbl.setForeground(isSelected ? ACCENT : TEXT);
-                lbl.setBorder(new EmptyBorder(4, 10, 4, 10));
-                return lbl;
-            }
-        });
-        return combo;
     }
 }
