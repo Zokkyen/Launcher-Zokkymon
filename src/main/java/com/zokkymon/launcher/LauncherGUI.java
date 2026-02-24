@@ -1525,8 +1525,9 @@ public class LauncherGUI extends JFrame {
             darkState[0] = !darkState[0];
             themeSwitch.repaint();
             switchLbl.setText(darkState[0] ? " Sombre" : " Lumineux");
+            applyTheme(darkState[0]);
+            if (refreshDialog[0] != null) refreshDialog[0].run();
             rebuildUI(darkState[0]);
-            SwingUtilities.invokeLater(() -> { if (refreshDialog[0] != null) refreshDialog[0].run(); });
         });
 
         JPanel switchRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
@@ -1539,8 +1540,9 @@ public class LauncherGUI extends JFrame {
             ThemeDefinition sel = (ThemeDefinition) cTheme.getSelectedItem();
             if (sel != null && !sel.id.equals(themeManager.getActiveId())) {
                 themeManager.setActiveId(sel.id);
+                applyTheme(darkState[0]);
+                if (refreshDialog[0] != null) refreshDialog[0].run();
                 rebuildUI(darkState[0]);
-                SwingUtilities.invokeLater(() -> { if (refreshDialog[0] != null) refreshDialog[0].run(); });
             }
         });
 
