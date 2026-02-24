@@ -959,7 +959,7 @@ public class LauncherGUI extends JFrame {
 
         // ── Badge « Zokkyen » cliquable → GitHub ────────────────────────────────
         boolean[] badgeHov = {false};
-        JLabel zokkyenBadge = new JLabel("Zokkyen GitHub ↗") {
+        JLabel zokkyenBadge = new JLabel("Zokkyen GitHub \u2197") {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -968,11 +968,12 @@ public class LauncherGUI extends JFrame {
                                       dark[ThemeDefinition.IDX_BG].getGreen(),
                                       dark[ThemeDefinition.IDX_BG].getBlue(), badgeHov[0] ? 230 : 190);
                 Color acc = dark[ThemeDefinition.IDX_ACCENT];
+                int arc = getHeight(); // pilule parfaite
                 g2.setColor(bg2);
-                g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 12, 12);
-                g2.setColor(new Color(acc.getRed(), acc.getGreen(), acc.getBlue(), badgeHov[0] ? 200 : 100));
-                g2.setStroke(new BasicStroke(1f));
-                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 12, 12);
+                g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, arc, arc);
+                g2.setColor(new Color(acc.getRed(), acc.getGreen(), acc.getBlue(), badgeHov[0] ? 220 : 130));
+                g2.setStroke(new BasicStroke(1.2f));
+                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, arc, arc);
                 g2.dispose();
                 super.paintComponent(g);
             }
