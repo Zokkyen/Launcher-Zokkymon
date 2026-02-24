@@ -6,6 +6,7 @@ import java.awt.Color;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 
 /**
@@ -166,6 +167,42 @@ public class ThemeManager {
     /** Retourne l'id du thème actif. */
     public String getActiveId() {
         return activeId;
+    }
+
+    /**
+     * Synchronise en sens unique les thèmes depuis {@code sourceDir}
+     * (ex : {@code config/themes/} à côté de l'exe) vers {@code themesDir} ({@code ~/.zokkymon/themes/}).
+     *
+     * <p>Copie uniquement les fichiers manquants ou dont la source est plus récente.
+     * Appelle {@link #reload()} si au moins un fichier a été modifié ou ajouté.</p>
+     *
+     * @param sourceDir répertoire source contenant des sous-dossiers de thèmes
+     */
+    public void syncFromSourceDir(File sourceDir) {
+        if (sourceDir == null || !sourceDir.isDirectory()) return;
+        File[] subDirs = sourceDir.listFiles(File::isDirectory);
+        if (subDirs == null) return;
+        boolean changed = false;
+        for (File srcThemeDir : subDirs) {
+            File dstThemeDir = new File(themesDir, srcThemeDir.getName());
+            File[] srcFiles  = srcThemeDir.listFiles(File::isFile);
+            if (srcFiles == null) continue;
+            for (File srcFile : srcFiles) {
+                File dstFile = new File(dstThemeDir, srcFile.getName());
+                if (!dstFile.exists() || srcFile.lastModified() > dstFile.lastModified()) {
+                    try {
+                        dstThemeDir.mkdirs();
+                        Files.copy(srcFile.toPath(), dstFile.toPath(),
+                            StandardCopyOption.REPLACE_EXISTING,
+                            StandardCopyOption.COPY_ATTRIBUTES);
+                        changed = true;
+                    } catch (Exception e) {
+                        System.err.println("[ThemeManager] Erreur sync '" + srcFile.getName() + "': " + e.getMessage());
+                    }
+                }
+            }
+        }
+        if (changed) reload();
     }
 
     /**

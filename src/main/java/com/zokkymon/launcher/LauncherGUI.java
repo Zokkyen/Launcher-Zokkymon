@@ -117,6 +117,14 @@ public class LauncherGUI extends JFrame {
         // Injecter le CLIENT_ID Azure depuis la config — jamais en dur dans le code source
         MicrosoftAuth.setClientId(config.getClientId());
         themeManager = new ThemeManager(new java.io.File(System.getProperty("user.home"), ".zokkymon"));
+        // Sync config/themes/ (à côté de l'exe) → ~/.zokkymon/themes/ : copie les fichiers manquants ou plus récents
+        try {
+            java.io.File exeFile = new java.io.File(
+                LauncherGUI.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+            java.io.File exeDir  = exeFile.isFile() ? exeFile.getParentFile() : exeFile;
+            java.io.File bundled = new java.io.File(exeDir, "config" + java.io.File.separator + "themes");
+            themeManager.syncFromSourceDir(bundled);
+        } catch (Exception ignored) {}
         themeManager.setActiveId(config.getActiveTheme());
         applyTheme(config.isDarkMode());
         updater = new Updater(this, config);
