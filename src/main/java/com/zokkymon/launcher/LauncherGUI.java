@@ -1428,18 +1428,25 @@ public class LauncherGUI extends JFrame {
         panel.add(lblPath, c);
         c.gridx = 1; c.fill = GridBagConstraints.HORIZONTAL; c.weightx = 1;
 
-        JTextField fPath = new JTextField(config.getInstallPath(), 22) {
-            @Override public Color getBackground() { return CARD_BG; }
-            @Override public Color getForeground()  { return TEXT; }
-        };
-        fPath.setUI(new javax.swing.plaf.basic.BasicTextFieldUI());
-        fPath.setOpaque(true);
+        JTextField fPath = new JTextField(config.getInstallPath(), 22);
+        fPath.setOpaque(false);
+        fPath.setBorder(new EmptyBorder(4, 8, 4, 8));
         fPath.setForeground(TEXT);
         fPath.setCaretColor(TEXT);
-        fPath.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 100), 1),
-            new EmptyBorder(4, 8, 4, 8)
-        ));
+
+        // Panel qui peint CARD_BG + bordure accent lui-même — FlatLaf ne touche pas au fond
+        JPanel pathBg = new JPanel(new BorderLayout()) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setColor(CARD_BG);
+                g2.fillRect(0, 0, getWidth(), getHeight());
+                g2.setColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 100));
+                g2.drawRect(0, 0, getWidth()-1, getHeight()-1);
+                g2.dispose();
+            }
+        };
+        pathBg.setOpaque(true);
+        pathBg.add(fPath, BorderLayout.CENTER);
 
         JButton browse = mkButton("Parcourir", CARD_BG, TEXT, 10, 28);
         browse.addActionListener(e -> {
@@ -1451,7 +1458,7 @@ public class LauncherGUI extends JFrame {
 
         JPanel pathRow = new JPanel(new BorderLayout(6, 0));
         pathRow.setOpaque(false);
-        pathRow.add(fPath,  BorderLayout.CENTER);
+        pathRow.add(pathBg,  BorderLayout.CENTER);
         pathRow.add(browse, BorderLayout.EAST);
         panel.add(pathRow, c);
 
@@ -1576,11 +1583,7 @@ public class LauncherGUI extends JFrame {
             // Champ chemin
             fPath.setForeground(TEXT);
             fPath.setCaretColor(TEXT);
-            fPath.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 100), 1),
-                new EmptyBorder(4, 8, 4, 8)
-            ));
-            fPath.repaint();
+            pathBg.repaint();
             // Boutons
             btnOk.setBackground(ACCENT);
             btnOk.setForeground(BG);
