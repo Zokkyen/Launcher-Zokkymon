@@ -39,35 +39,40 @@ public class Updater {
     }
 
     private void downloadFile(String urlStr, File dest, String fileName) throws IOException {
+        downloadFile(urlStr, dest, fileName, 0, 100);
+    }
+
+    private void downloadFile(String urlStr, File dest, String fileName, int lo, int hi) throws IOException {
         URL url = URI.create(urlStr).toURL();
         URLConnection connection = url.openConnection();
         connection.setConnectTimeout(10000);
         connection.setReadTimeout(10000);
-        
+
         // Récupérer la taille du fichier
         long contentLength = connection.getContentLengthLong();
-        
+
         try (InputStream in = connection.getInputStream();
              java.io.FileOutputStream out = new java.io.FileOutputStream(dest)) {
-            
+
             byte[] buffer = new byte[8192];
             int bytesRead;
             long totalBytesRead = 0;
             int lastLoggedProgress = -1;  // Pour afficher le log seulement tous les 10%
-            
+
             while ((bytesRead = in.read(buffer)) != -1) {
                 out.write(buffer, 0, bytesRead);
                 totalBytesRead += bytesRead;
-                
-                // Mettre à jour la barre de progression
+
+                // Mettre à jour la barre de progression dans la plage [lo, hi]
                 if (contentLength > 0) {
-                    int progress = (int) ((totalBytesRead * 100) / contentLength);
+                    int raw      = (int) ((totalBytesRead * 100) / contentLength);
+                    int progress = lo + (hi - lo) * raw / 100;
                     gui.setProgress(progress);
-                    
+
                     // Afficher le log seulement tous les 10%
-                    if (fileName != null && progress >= lastLoggedProgress + 10) {
-                        gui.appendLog("[*] " + fileName + ": " + progress + "%");
-                        lastLoggedProgress = progress;
+                    if (fileName != null && raw >= lastLoggedProgress + 10) {
+                        gui.appendLog("[*] " + fileName + ": " + raw + "%");
+                        lastLoggedProgress = raw;
                     }
                 }
             }
@@ -206,7 +211,8 @@ public class Updater {
                 String secureDownloadUrl = downloadUrl.contains("?") ?
                     downloadUrl + "&token=" + URLEncoder.encode(token, StandardCharsets.UTF_8) :
                     downloadUrl + "?token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
-                downloadFile(secureDownloadUrl, tempZip, "modpack_v" + version + ".zip");
+                // Téléchargement : 0 → 60 %
+                downloadFile(secureDownloadUrl, tempZip, "modpack_v" + version + ".zip", 0, 60);
 
                 if (expectedHash != null && !expectedHash.isEmpty()) {
                     gui.appendLog("Vérification SHA-256...");
@@ -220,7 +226,8 @@ public class Updater {
                     }
                 }
 
-                extractZip(tempZip, modulesDir);
+                // Extraction : 60 → 100 %
+                extractZip(tempZip, modulesDir, 60, 100);
                 tempZip.delete();
 
                 // Enregistrer la version installée dans launcher_config.json
@@ -253,7 +260,7 @@ public class Updater {
      * Utilise {@link ZipFile} (accès aléatoire) pour connaître le nombre d'entrées
      * immédiatement via {@code size()}, sans double passe.
      */
-    private void extractZip(File zipFile, File extractDir) throws IOException {
+    private void extractZip(File zipFile, File extractDir, int lo, int hi) throws IOException {
         extractDir.mkdirs();
         try (ZipFile zf = new ZipFile(zipFile)) {
             int totalEntries    = zf.size();
@@ -284,11 +291,12 @@ public class Updater {
 
                 currentEntry++;
                 if (totalEntries > 0) {
-                    int pct = (currentEntry * 100) / totalEntries;
+                    int raw = (currentEntry * 100) / totalEntries;
+                    int pct = lo + (hi - lo) * raw / 100;
                     gui.setProgress(pct);
-                    if (pct >= lastLoggedPct + 10) {
-                        gui.appendLog("[*] Extraction : " + pct + "%");
-                        lastLoggedPct = pct;
+                    if (raw >= lastLoggedPct + 10) {
+                        gui.appendLog("[*] Extraction : " + raw + "%");
+                        lastLoggedPct = raw;
                     }
                 }
             }

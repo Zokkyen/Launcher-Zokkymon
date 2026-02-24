@@ -8,6 +8,8 @@ import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 public class Launcher {
 
@@ -808,143 +810,86 @@ public class Launcher {
      */
     private static String getMinecraftClientJarUrl(String version, LauncherGUI gui) throws Exception {
         String versionManifestUrl = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
-        
+
         try {
-            String line;  // Déclarer la variable avant de l'utiliser
-            
             gui.appendLog("[*] Récupération du manifest Mojang pour version " + version + "...");
-            
+
             String versionData = null;
-            
-            // Essayer d'abord de charger le JSON depuis les ressources locales
+
+            // 1. Essayer les ressources locales (/minecraft/<version>.json)
             String resourcePath = "/minecraft/" + version + ".json";
-            try {
-                InputStream resourceStream = Launcher.class.getResourceAsStream(resourcePath);
-                if (resourceStream != null) {
+            try (InputStream rs = Launcher.class.getResourceAsStream(resourcePath)) {
+                if (rs != null) {
                     gui.appendLog("[*] Fichier JSON trouvé dans les ressources locales");
-                    BufferedReader resourceReader = new BufferedReader(new InputStreamReader(resourceStream));
-                    StringBuilder resourceJson = new StringBuilder();
-                    while ((line = resourceReader.readLine()) != null) {
-                        resourceJson.append(line);
-                    }
-                    resourceReader.close();
-                    versionData = resourceJson.toString();
+                    BufferedReader rr = new BufferedReader(new InputStreamReader(rs));
+                    StringBuilder sb = new StringBuilder();
+                    String ln;
+                    while ((ln = rr.readLine()) != null) sb.append(ln);
+                    versionData = sb.toString();
                 }
-            } catch (Exception e) {
-                // Ressource locale non disponible, on continue vers le téléchargement
-            }
-            
-            // Si pas trouvé localement, essayer de récupérer depuis Mojang
+            } catch (Exception ignored) {}
+
+            // 2. Sinon : manifest Mojang → URL du JSON de version
             if (versionData == null) {
-                gui.appendLog("[*] Téléchargement du manifest Mojang...");
-                
-                // Télécharger le manifest JSON
-                URL url = URI.create(versionManifestUrl).toURL();
-                URLConnection conn = url.openConnection();
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(5000);
-                
-                BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                StringBuilder jsonResponse = new StringBuilder();
-                
-                while ((line = reader.readLine()) != null) {
-                    jsonResponse.append(line);
-                }
-                reader.close();
-                
-                String json = jsonResponse.toString();
-                // Parser JSON pour trouver l'URL de la version
-                String versionKey = "\"id\":\"" + version + "\"";
-                int versionIndex = json.indexOf(versionKey);
                 String versionJsonUrl = null;
-                
-                if (versionIndex == -1) {
-                    gui.appendLog("[WARN] Version " + version + " non trouvée dans le manifest récent");
-                    // Utiliser URL hardcodée pour 1.21.1
+
+                try {
+                    gui.appendLog("[*] Téléchargement du manifest Mojang...");
+                    URLConnection conn = URI.create(versionManifestUrl).toURL().openConnection();
+                    conn.setConnectTimeout(8000);
+                    conn.setReadTimeout(15000);
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                    StringBuilder manifestSb = new StringBuilder();
+                    String ln;
+                    while ((ln = reader.readLine()) != null) manifestSb.append(ln);
+                    reader.close();
+
+                    JSONArray versions = new JSONObject(manifestSb.toString()).getJSONArray("versions");
+                    for (int i = 0; i < versions.length(); i++) {
+                        JSONObject v = versions.getJSONObject(i);
+                        if (version.equals(v.optString("id"))) {
+                            versionJsonUrl = v.getString("url");
+                            break;
+                        }
+                    }
+                } catch (Exception e) {
+                    gui.appendLog("[WARN] Erreur manifest: " + e.getMessage());
+                }
+
+                if (versionJsonUrl == null) {
+                    gui.appendLog("[WARN] Version " + version + " non trouvée dans le manifest, URL de secours utilisée");
                     if ("1.21.1".equals(version)) {
                         versionJsonUrl = "https://piston-meta.mojang.com/v1/packages/550bf292a202ba3f82181e04672e6e4d598d45ea/1.21.1.json";
                     } else {
-                        gui.appendLog("[ERROR] Version " + version + " non supportée");
+                        gui.appendLog("[ERROR] Version " + version + " non supportée et introuvable dans le manifest");
                         return null;
                     }
-                } else {
-                    // Chercher l'URL dans la même entrée de version
-                    int objectStart = json.lastIndexOf("{", versionIndex);
-                    int objectEnd = json.indexOf("}", versionIndex);
-                    
-                    if (objectStart != -1 && objectEnd != -1) {
-                        String versionObject = json.substring(objectStart, objectEnd + 1);
-                        int urlIndex = versionObject.indexOf("\"url\":\"");
-                        if (urlIndex != -1) {
-                            int urlStart = urlIndex + 8;
-                            int urlEndIndex = versionObject.indexOf("\"", urlStart);
-                            if (urlEndIndex != -1) {
-                                versionJsonUrl = versionObject.substring(urlStart, urlEndIndex);
-                            }
-                        }
-                    }
                 }
-                
-                if (versionJsonUrl == null) {
-                    gui.appendLog("[ERROR] Impossible de trouver l'URL JSON pour la version " + version);
-                    return null;
-                }
-                
+
                 gui.appendLog("[*] URL de version trouvée, récupération du JSON...");
-                
-                // Récupérer le JSON de la version
-                URL versionUrl = URI.create(versionJsonUrl).toURL();
-                URLConnection versionConn = versionUrl.openConnection();
-                versionConn.setConnectTimeout(5000);
-                versionConn.setReadTimeout(5000);
-                
-                BufferedReader versionReader = new BufferedReader(new InputStreamReader(versionConn.getInputStream()));
-                StringBuilder versionJson = new StringBuilder();
-                
-                while ((line = versionReader.readLine()) != null) {
-                    versionJson.append(line);
-                }
-                versionReader.close();
-                
-                versionData = versionJson.toString();
+                URLConnection vc = URI.create(versionJsonUrl).toURL().openConnection();
+                vc.setConnectTimeout(8000);
+                vc.setReadTimeout(15000);
+                BufferedReader vr = new BufferedReader(new InputStreamReader(vc.getInputStream()));
+                StringBuilder versionSb = new StringBuilder();
+                String ln;
+                while ((ln = vr.readLine()) != null) versionSb.append(ln);
+                vr.close();
+                versionData = versionSb.toString();
             }
-            
-            // Parser le JSON pour trouver l'URL du client
-            // Format: "downloads":{"client":{"sha1":"...","size":...,"url":"https://..."}}
-            int clientIndex = versionData.indexOf("\"client\"");
-            if (clientIndex != -1) {
-                int clientUrlIndex = versionData.indexOf("\"url\":\"", clientIndex);
-                if (clientUrlIndex != -1) {
-                    int clientUrlStart = clientUrlIndex + 8;
-                    int clientUrlEnd = versionData.indexOf("\"", clientUrlStart);
-                    if (clientUrlEnd != -1) {
-                        String clientUrl = versionData.substring(clientUrlStart, clientUrlEnd);
-                        gui.appendLog("[OK] URL du client trouvée: " + clientUrl);
-                        return clientUrl;
-                    }
-                } else {
-                    // Fallback: reconstruire l'URL depuis le sha1
-                    int sha1Index = versionData.indexOf("\"sha1\":\"", clientIndex);
-                    if (sha1Index != -1) {
-                        int sha1Start = sha1Index + 9;
-                        int sha1End = versionData.indexOf("\"", sha1Start);
-                        if (sha1End != -1) {
-                            String clientHash = versionData.substring(sha1Start, sha1End);
-                            String clientUrl = "https://piston-data.mojang.com/v1/objects/" +
-                                             clientHash + "/client.jar";
-                            gui.appendLog("[OK] URL du client trouvée via sha1");
-                            return clientUrl;
-                        }
-                    }
-                }
-            } else {
-                gui.appendLog("[WARN] Section 'client' non trouvée dans le JSON de version");
-            }
+
+            // 3. Parser proprement downloads.client.url
+            String clientUrl = new JSONObject(versionData)
+                    .getJSONObject("downloads")
+                    .getJSONObject("client")
+                    .getString("url");
+            gui.appendLog("[OK] URL du client trouvée: " + clientUrl);
+            return clientUrl;
+
         } catch (Exception e) {
             gui.appendLog("[WARN] Erreur récupération manifest: " + e.getMessage());
-            e.printStackTrace();
         }
-        
+
         return null;
     }
 

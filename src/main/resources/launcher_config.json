@@ -4,12 +4,12 @@
   "enableVersionCheck": true,
   "launcherVersion": "0.1.0",
   "serverUrl": "https://zokkyen-cobblemon.ddns.net",
-  "launcherInfoUrl": "https://raw.githubusercontent.com/Zokkyen/Launcher-Zokkymon/main/info.json",
+  "launcherInfoUrl": "https://raw.githubusercontent.com/Zokkyen/Launcher-Zokkymon/beta/info.json",
   "modpackName": "Zokkymon",
   "language": "fr",
   "minecraftVersion": "1.21.1",
   "fabricVersion": "0.18.1",
-  "modpackToken": "",
+  "modpackToken": "HvzStxYm4fttD88R",
   "ram": "8 Go",
   "msaClientId": ""
 }

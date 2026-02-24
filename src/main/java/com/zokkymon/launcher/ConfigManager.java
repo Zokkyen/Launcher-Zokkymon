@@ -219,29 +219,36 @@ public class ConfigManager {
     }
 
     public String getModpackToken() {
-        return config.optString("modpackToken", "");
+        String raw = config.optString("modpackToken", "");
+        if (raw.isBlank()) return "";
+        if (SecureStorage.looksEncrypted(raw)) {
+            String decrypted = SecureStorage.decrypt(raw);
+            return decrypted != null ? decrypted : "";
+        }
+        // Valeur en clair (ex : premier lancement depuis le JAR) → on chiffre immédiatement
+        try {
+            String enc = SecureStorage.encrypt(raw);
+            if (enc != null) { config.put("modpackToken", enc); saveConfig(); }
+        } catch (Exception ignored) {}
+        return raw;
     }
 
     public void setModpackToken(String token) {
-        config.put("modpackToken", token);
+        try {
+            String enc = SecureStorage.encrypt(token);
+            config.put("modpackToken", enc != null ? enc : token);
+        } catch (Exception e) {
+            config.put("modpackToken", token);
+        }
         saveConfig();
     }
 
     public boolean isDarkMode() {
-        return config.optBoolean("darkMode", false);
+        return config.optBoolean("darkMode", true);
     }
 
     public void setDarkMode(boolean dark) {
         config.put("darkMode", dark);
-        saveConfig();
-    }
-
-    public String getActiveTheme() {
-        return config.optString("activeTheme", "default");
-    }
-
-    public void setActiveTheme(String themeId) {
-        config.put("activeTheme", themeId);
         saveConfig();
     }
 
