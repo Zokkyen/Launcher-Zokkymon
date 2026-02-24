@@ -1,143 +1,96 @@
-# Zokkymon Launcher
+<p align="center">
+  <img src="banniere.png" alt="Zokkymon Banner" width="800"/>
+</p>
 
-Launcher Java pour Minecraft avec Cobblemon Academy 2 (MC 1.21.1, Fabric 0.17.3).
+<h1 align="center">Launcher Zokkymon</h1>
 
-## Fonctionnalités
+<p align="center">
+Un launcher personnalisé créé par <b>Zokkyen</b> pour jouer entre amis à un modpack basé sur Cobblemon Academy 2.
+</p>
 
-✓ Interface graphique moderne avec progress bar
-✓ Vérification de version des mods
-✓ Téléchargement automatique des mises à jour
-✓ Validation d'intégrité (SHA-256)
-✓ Lancement direct de Minecraft avec Fabric
-✓ Logs en direct des opérations
-✓ Conversion en EXE Windows
+---
 
-## Structure du Projet
+## 🎮 À propos du projet
 
-```
-ZokkymonLauncher/
-├── src/main/java/com/zokkymon/launcher/
-│   ├── Main.java                 # Point d'entrée
-│   ├── LauncherGUI.java          # Interface graphique
-│   ├── Launcher.java             # Lancement Minecraft
-│   ├── Updater.java              # Gestion des mises à jour
-│   └── ConfigManager.java        # Gestion de la configuration
-├── config/
-│   ├── launcher_config.json      # Configuration du launcher
-│   └── version.json.example      # Format de la version serveur
-├── mods/                         # Dossier des mods (créé à l'exécution)
-├── minecraft/                    # Dossier Minecraft (créé à l'exécution)
-├── pom.xml                       # Configuration Maven
-├── SETUP.md                      # Guide de configuration
-├── generate_hashes.bat           # Script Windows pour hashes SHA-256
-└── generate_hashes.sh            # Script Linux pour hashes SHA-256
-```
+**Launcher Zokkymon** est un projet personnel développé dans le but de jouer entre amis dans un environnement sécurisé et communautaire.
 
-## Compilation
+Ce launcher permet :
 
-### Prérequis
-- Java 11+
-- Maven 3.8+
+- L'installation automatique du modpack
+- La gestion des mises à jour
+- Une connexion simplifiée au serveur
+- Une expérience optimisée pour notre communauté
 
-### Compilation
-```bash
-mvn clean package
-```
+Il n’a **aucun objectif commercial**.
 
-Cela génère: `target/ZokkymonLauncher.jar`
+---
 
-## Configuration
+## 🌍 Objectif
 
-1. Éditez `config/launcher_config.json`:
-```json
-{
-  "serverUrl": "http://192.168.1.100:80",
-  "minecraftVersion": "1.21.1",
-  "fabricVersion": "0.17.3",
-  "modpackName": "Zokkymon",
-  "ram": "4G"
-}
-```
+Créer un espace de jeu privé autour de **Cobblemon Academy 2**, avec :
 
-2. Sur le serveur Ubuntu, organisez vos fichiers:
-```
-/var/www/html/modpack/
-├── version.json
-├── mods/
-│   ├── cobblemon.jar
-│   ├── fabric-api.jar
-│   └── ...
-```
+- Une infrastructure stable
+- Un serveur sécurisé
+- Une gestion propre des versions
+- Un esprit communautaire
 
-3. Générez les hashes:
-```bash
-./generate_hashes.sh  # Linux
-# ou
-generate_hashes.bat   # Windows
-```
+Ce projet est développé uniquement pour le plaisir et le partage.
 
-## Conversion en EXE
+---
 
-Voir le fichier [SETUP.md](SETUP.md) pour les détails sur la création d'un executé Windows avec Launch4j ou Inno Setup.
+## 🔐 Sécurité
 
-## Lancement
+Le serveur fonctionne avec :
 
-**JAR directement:**
-```bash
-java -jar target/ZokkymonLauncher.jar
-```
+- `online-mode=true`
+- Whitelist activée
+- Vérification d’authentification officielle Microsoft/Minecraft
+- Distribution contrôlée du modpack
 
-**EXE (après conversion):**
-Double-click sur `ZokkymonLauncher.exe`
+L’objectif est de garantir :
 
-## Format du fichier version.json serveur
+- Une expérience sécurisée
+- Aucune usurpation d’identité
+- Un environnement sain
 
-```json
-{
-  "version": "1.0.0",
-  "minecraftVersion": "1.21.1",
-  "fabricVersion": "0.17.3",
-  "modpackName": "Zokkymon",
-  "files": [
-    {
-      "name": "cobblemon.jar",
-      "path": "mods",
-      "hash": "sha256_hash_here"
-    }
-  ]
-}
-```
+---
 
-## Troubleshooting
+## ⚙️ Fonctionnalités du launcher
 
-### Le launcher ne trouve pas les mises à jour
-- Vérifiez que l'URL serveur est correcte
-- Assurez-vous que le serveur est accessible
-- Vérifiez que le fichier `version.json` existe sur le serveur
+- Installation automatique de Java
+- Installation de Fabric
+- Téléchargement automatique du modpack
+- Vérification des mises à jour
+- Interface personnalisée
 
-### Les mods ne se téléchargent pas
-- Vérifiez les logs pour les détails d'erreur
-- Assurez-vous que les fichiers existent sur le serveur
-- Vérifiez les permissions du serveur web
+---
 
-### Erreur Java lors du lancement
-- Vérifiez que Java 11+ est installé
-- Vérifiez que Minecraft et Fabric sont bien placés
+## 📦 À propos du modpack
 
-## Architecture du Launcher
+Le modpack est basé sur **Cobblemon Academy 2** et peut inclure des ajustements spécifiques pour notre serveur.
 
-1. **Main.java** - Point d'entrée, crée les dossiers et lance la GUI
-2. **LauncherGUI.java** - Interface Swing, gère l'affichage et les interactions
-3. **ConfigManager.java** - Charge/sauvegarde la configuration JSON
-4. **Updater.java** - Vérifie les versions et télécharge les fichiers
-5. **Launcher.java** - Lance Minecraft avec les bons paramètres JVM
+Ce launcher n’est pas affilié aux créateurs officiels du modpack.
 
-## Notes Importantes
+---
 
-- Les fichiers JAR des mods doivent être dans le dossier `mods/` sur le serveur
-- Les hashes SHA-256 sont vérifiés pour l'intégrité dos téléchargement
-- Le launcher crée automatiquement les dossiers nécessaires
+## ⚠️ Disclaimer
 
-## Support
+Ce projet :
 
-Pour plus d'aide, consultez la section "SETUP.md".
+- N’est pas affilié à Mojang, Microsoft ou aux créateurs de Cobblemon.
+- N’a aucun but commercial.
+- Ne distribue aucun contenu payant.
+- Nécessite un compte Minecraft officiel valide.
+
+---
+
+## 👤 Auteur
+
+Développé par **Zokkyen**  
+Projet communautaire privé.
+
+---
+
+<p align="center">
+Fait avec passion pour jouer entre amis 💛
+</p>
