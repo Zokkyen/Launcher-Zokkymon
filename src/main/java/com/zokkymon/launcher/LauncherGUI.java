@@ -579,7 +579,7 @@ public class LauncherGUI extends JFrame {
                     updateAuthCard(null);
                 }
             } else {
-                showMicrosoftLoginDialog();
+                showMicrosoftLoginDialog(null);
             }
         });
 
@@ -611,7 +611,7 @@ public class LauncherGUI extends JFrame {
         });
     }
 
-    private void showMicrosoftLoginDialog() {
+    private void showMicrosoftLoginDialog(Runnable onSuccess) {
         authActionBtn.setEnabled(false);
         appendLog("[MSA] Démarrage du Device Code Flow...");
         new Thread(() -> {
@@ -710,7 +710,10 @@ public class LauncherGUI extends JFrame {
                         pollLbl.setForeground(new Color(52, 211, 153));
                     });
                     Thread.sleep(800);
-                    SwingUtilities.invokeLater(dialog::dispose);
+                    SwingUtilities.invokeLater(() -> {
+                        dialog.dispose();
+                        if (onSuccess != null) onSuccess.run();
+                    });
                 } catch (InterruptedException ignored) {
                     appendLog("[MSA] Connexion annulée.");
                 } catch (Exception ex) {
@@ -1297,6 +1300,272 @@ public class LauncherGUI extends JFrame {
     }
 
     private void launchGame() {
+        if (!config.hasMsaProfile()) {
+            showPlayModeDialog();
+            return;
+        }
+        doLaunchGame();
+    }
+
+    private void showPlayModeDialog() {
+        JDialog dialog = new JDialog(this, "Mode de jeu", true);
+        dialog.setUndecorated(true);
+        dialog.setSize(460, 300);
+        dialog.setLocationRelativeTo(this);
+        dialog.setBackground(new Color(0, 0, 0, 0));
+
+        // ── Fond principal ────────────────────────────────────────────────
+        JPanel root = new JPanel(new BorderLayout()) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                // fond fenêtre
+                g2.setColor(new Color(BG.getRed(), BG.getGreen(), BG.getBlue(), 250));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 20, 20);
+                // bordure accent
+                GradientPaint gp = new GradientPaint(0, 0,
+                    new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 180),
+                    getWidth(), getHeight(),
+                    new Color(ACCENT.getRed() / 3, ACCENT.getGreen() / 3, ACCENT.getBlue(), 80));
+                g2.setPaint(gp);
+                g2.setStroke(new BasicStroke(1.5f));
+                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 20, 20);
+                // ligne accent en haut
+                g2.setPaint(new GradientPaint(40, 0,
+                    new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 0),
+                    getWidth() / 2, 0, ACCENT,
+                    true));
+                g2.setStroke(new BasicStroke(2f));
+                g2.drawLine(40, 0, getWidth() - 40, 0);
+                g2.dispose();
+            }
+        };
+        root.setOpaque(false);
+        root.setBorder(new EmptyBorder(28, 32, 24, 32));
+
+        // ── Icône + Titre ─────────────────────────────────────────────────
+        JPanel header = new JPanel(new BorderLayout(14, 0));
+        header.setOpaque(false);
+
+        JPanel iconLbl = new JPanel() {
+            private final String emoji = "\uD83D\uDD13";
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                int d = Math.min(getWidth(), getHeight()) - 2;
+                int ox = (getWidth() - d) / 2;
+                int oy = (getHeight() - d) / 2;
+                // cercle de fond plus lumineux
+                g2.setColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80));
+                g2.fillOval(ox, oy, d, d);
+                // bordure accent
+                g2.setColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 160));
+                g2.setStroke(new BasicStroke(1.5f));
+                g2.drawOval(ox, oy, d, d);
+                // emoji centré en blanc via FontMetrics
+                g2.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 24));
+                g2.setColor(Color.WHITE);
+                FontMetrics fm = g2.getFontMetrics();
+                int tx = (getWidth()  - fm.stringWidth(emoji)) / 2;
+                int ty = (getHeight() + fm.getAscent() - fm.getDescent()) / 2;
+                g2.drawString(emoji, tx, ty);
+                g2.dispose();
+            }
+        };
+        iconLbl.setOpaque(false);
+        iconLbl.setPreferredSize(new Dimension(52, 52));
+
+        JPanel titleBlock = new JPanel(new GridLayout(2, 1, 0, 2));
+        titleBlock.setOpaque(false);
+
+        JLabel titleLbl = new JLabel("Vous n'êtes pas connecté");
+        titleLbl.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        titleLbl.setForeground(TEXT);
+
+        JLabel subLbl = new JLabel("Choisissez comment vous souhaitez lancer le jeu");
+        subLbl.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        subLbl.setForeground(TEXT_DIM);
+
+        titleBlock.add(titleLbl);
+        titleBlock.add(subLbl);
+
+        header.add(iconLbl, BorderLayout.WEST);
+        header.add(titleBlock, BorderLayout.CENTER);
+
+        // ── Séparateur ────────────────────────────────────────────────────
+        JSeparator sep = new JSeparator() {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setPaint(new GradientPaint(0, 0, new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 0),
+                    getWidth() / 2, 0, new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80), true));
+                g2.fillRect(0, 0, getWidth(), getHeight());
+                g2.dispose();
+            }
+        };
+        sep.setPreferredSize(new Dimension(0, 1));
+        sep.setOpaque(false);
+
+        // ── Boutons de choix ──────────────────────────────────────────────
+        JPanel btnRow = new JPanel(new GridLayout(1, 2, 14, 0));
+        btnRow.setOpaque(false);
+
+        // Bouton "En ligne"
+        JButton onlineBtn = new JButton("<html><center>"
+            + "<span style='font-size:18px'>\uD83C\uDF10</span><br>"
+            + "<b style='font-size:13px'>En ligne</b><br>"
+            + "<span style='font-size:10px; color:#c0a0e0'>Compte Microsoft</span>"
+            + "</center></html>") {
+            private boolean hovered = false;
+            {
+                addMouseListener(new MouseAdapter() {
+                    public void mouseEntered(MouseEvent e) { hovered = true;  repaint(); }
+                    public void mouseExited (MouseEvent e) { hovered = false; repaint(); }
+                });
+            }
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                Color base = hovered
+                    ? new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 220)
+                    : new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 140);
+                GradientPaint gp = new GradientPaint(0, 0, base,
+                    0, getHeight(), new Color(ACCENT.getRed() / 2, 0, ACCENT.getBlue() / 2, 160));
+                g2.setPaint(gp);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 14, 14);
+                g2.setColor(new Color(255, 255, 255, hovered ? 60 : 30));
+                g2.setStroke(new BasicStroke(1f));
+                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 14, 14);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        onlineBtn.setForeground(Color.WHITE);
+        onlineBtn.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        onlineBtn.setFocusPainted(false);
+        onlineBtn.setContentAreaFilled(false);
+        onlineBtn.setBorderPainted(false);
+        onlineBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        onlineBtn.setPreferredSize(new Dimension(0, 90));
+
+        // Bouton "Hors ligne"
+        JButton offlineBtn = new JButton("<html><center>"
+            + "<span style='font-size:18px'>\uD83D\uDEAB</span><br>"
+            + "<b style='font-size:13px'>Hors ligne</b><br>"
+            + "<span style='font-size:10px'>Mode sans compte</span>"
+            + "</center></html>") {
+            private boolean hovered = false;
+            {
+                addMouseListener(new MouseAdapter() {
+                    public void mouseEntered(MouseEvent e) { hovered = true;  repaint(); }
+                    public void mouseExited (MouseEvent e) { hovered = false; repaint(); }
+                });
+            }
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                Color base = hovered
+                    ? new Color(CARD_BG.getRed() + 20, CARD_BG.getGreen() + 10, CARD_BG.getBlue() + 30, 240)
+                    : new Color(CARD_BG.getRed(), CARD_BG.getGreen(), CARD_BG.getBlue(), 200);
+                g2.setColor(base);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 14, 14);
+                g2.setColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), hovered ? 120 : 50));
+                g2.setStroke(new BasicStroke(1f));
+                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 14, 14);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        offlineBtn.setForeground(TEXT);
+        offlineBtn.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        offlineBtn.setFocusPainted(false);
+        offlineBtn.setContentAreaFilled(false);
+        offlineBtn.setBorderPainted(false);
+        offlineBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        btnRow.add(onlineBtn);
+        btnRow.add(offlineBtn);
+
+        // ── Bouton Annuler ────────────────────────────────────────────────
+        JLabel cancelLnk = new JLabel("Annuler", SwingConstants.CENTER) {
+            private boolean hovered = false;
+            {
+                setOpaque(false);
+                setCursor(new Cursor(Cursor.HAND_CURSOR));
+                setFont(new Font("Segoe UI", Font.PLAIN, 11));
+                setForeground(TEXT_DIM);
+                addMouseListener(new MouseAdapter() {
+                    public void mouseEntered(MouseEvent e) { hovered = true;  setForeground(TEXT);     repaint(); }
+                    public void mouseExited (MouseEvent e) { hovered = false; setForeground(TEXT_DIM); repaint(); }
+                });
+            }
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                // fond pilule
+                if (hovered) {
+                    g2.setColor(new Color(CARD_BG.getRed(), CARD_BG.getGreen(), CARD_BG.getBlue(), 130));
+                    g2.fillRoundRect(0, 0, getWidth(), getHeight(), 20, 20);
+                }
+                // bordure pilule
+                g2.setColor(new Color(TEXT_DIM.getRed(), TEXT_DIM.getGreen(), TEXT_DIM.getBlue(), hovered ? 180 : 80));
+                g2.setStroke(new BasicStroke(1f));
+                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 20, 20);
+                // croix dessinée à la main (6px, proche du texte)
+                int cy = getHeight() / 2;
+                int cx = 18;
+                int r  = 4;
+                Color xCol = hovered ? TEXT : TEXT_DIM;
+                g2.setColor(xCol);
+                g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawLine(cx - r, cy - r, cx + r, cy + r);
+                g2.drawLine(cx + r, cy - r, cx - r, cy + r);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        cancelLnk.setBorder(new EmptyBorder(0, 22, 0, 8));
+        cancelLnk.setPreferredSize(new Dimension(120, 28));
+
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        footer.setOpaque(false);
+        footer.add(cancelLnk);
+
+        // ── Assemblage ────────────────────────────────────────────────────
+        JPanel center = new JPanel();
+        center.setLayout(new BoxLayout(center, BoxLayout.Y_AXIS));
+        center.setOpaque(false);
+        center.add(header);
+        center.add(Box.createRigidArea(new Dimension(0, 16)));
+        center.add(sep);
+        center.add(Box.createRigidArea(new Dimension(0, 20)));
+        center.add(btnRow);
+        center.add(Box.createRigidArea(new Dimension(0, 14)));
+        center.add(footer);
+
+        root.add(center, BorderLayout.CENTER);
+        dialog.setContentPane(root);
+
+        // ── Actions ───────────────────────────────────────────────────────
+        boolean[] chosen = {false};
+
+        onlineBtn.addActionListener(e -> {
+            chosen[0] = true;
+            dialog.dispose();
+            showMicrosoftLoginDialog(this::doLaunchGame);
+        });
+        offlineBtn.addActionListener(e -> {
+            chosen[0] = true;
+            dialog.dispose();
+            doLaunchGame();
+        });
+        cancelLnk.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) { dialog.dispose(); }
+        });
+
+        dialog.setVisible(true);
+    }
+
+    private void doLaunchGame() {
         playButton.setEnabled(false);
         setStatus("Lancement en cours...");
         appendLog(">> Démarrage du processus de jeu...");
