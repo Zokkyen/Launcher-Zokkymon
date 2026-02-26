@@ -68,7 +68,6 @@ jobs:
             <icon>$iconPath</icon>
             <jre>
               <path>%USERPROFILE%\\.zokkymon\\Jre_21</path>
-              <requiresJdk>false</requiresJdk>
               <requires64Bit>true</requires64Bit>
               <minVersion>21.0.0</minVersion>
               <maxVersion></maxVersion>
