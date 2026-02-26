@@ -1,6 +1,6 @@
 {
-  "version": "0.3.0",
-  "url": "https://github.com/Zokkyen/Launcher-Zokkymon/releases/download/v0.3.0/ZokkymonLauncher.exe",
-  "sha256": "dcd4a052c15bc4e056311655a6d334740038ee7f948ff99c7afc4af9e29017e4",
-  "changelog": "- UI/UX retravaillée (barre d'actions allégée, badges Release Notes/GitHub).\n- Système de logs professionnel (~/.zokkymon/logs) : auto-scroll, export complet/ciblé, rapports incidents.\n- Rotation et rétention des logs + nettoyage manuel depuis l'interface.\n- Canal de mise à jour stable/beta configurable.\n- Health-check pré-lancement (disque, RAM, Java, endpoints) avec diagnostic clair.\n- Mode Réparer l'installation (ciblé, sans suppression complète).\n- Profils de lancement (performance, quality, low-end, custom) + JVM args personnalisés.\n- Sauvegarde/restauration configs joueur et scan mods avant lancement."
+  "version": "0.3.1",
+  "url": "https://github.com/Zokkyen/Launcher-Zokkymon/releases/download/v0.3.1/ZokkymonLauncher.exe",
+  "sha256": "d2c211e51dc439aee2438a9c1f1b3f4312a8247174e1ec78bae8b32796558de7",
+  "changelog": "## 🚀 Zokkymon Launcher 0.3.1\r\n\r\n- Fiabilisation de la mise à jour automatique du launcher (ciblage EXE + persistance de version locale).\r\n- Correctifs CI/CD de release (build EXE Launch4j sur GitHub Actions, publication stable/beta plus robuste).\r\n- Mise à jour automatique de `info.json` directement dans les workflows de release (version, URL, SHA-256, changelog).\r\n- Documentation des processus de release clarifiée (`main` orienté utilisateur, `beta` orienté technique).\r\n\r\n## ✅ Recommandé\r\n\r\n- Faire un backup de la configuration locale avant mise à jour."
 }
