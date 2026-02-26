@@ -111,7 +111,35 @@ jobs:
           "@
 
           Set-Content -Path $cfgPath -Value $xml -Encoding UTF8
-          launch4jc $cfgPath
+
+          $launch4jCmd = Get-Command launch4jc -ErrorAction SilentlyContinue
+          if (-not $launch4jCmd) {
+            $launch4jCmd = Get-Command launch4jc.exe -ErrorAction SilentlyContinue
+          }
+
+          $candidatePaths = @(
+            "C:\\ProgramData\\chocolatey\\lib\\launch4j\\tools\\launch4j\\launch4jc.exe",
+            "C:\\Program Files\\Launch4j\\launch4jc.exe",
+            "C:\\Program Files (x86)\\Launch4j\\launch4jc.exe"
+          )
+
+          if (-not $launch4jCmd) {
+            foreach ($candidate in $candidatePaths) {
+              if (Test-Path $candidate) {
+                $launch4jCmd = @{ Source = $candidate }
+                break
+              }
+            }
+          }
+
+          if (-not $launch4jCmd) {
+            throw "launch4jc introuvable après installation Chocolatey."
+          }
+
+          & $launch4jCmd.Source $cfgPath
+          if ($LASTEXITCODE -ne 0) {
+            throw "Échec launch4jc (code=$LASTEXITCODE)"
+          }
 
           if (!(Test-Path $exePath)) { throw "EXE non généré: $exePath" }
 
