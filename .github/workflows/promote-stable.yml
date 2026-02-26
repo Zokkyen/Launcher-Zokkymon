@@ -1,0 +1,145 @@
+name: Promote Stable Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      stable_version:
+        description: "Version stable à publier (ex: 0.4.0)"
+        required: true
+        type: string
+      merge_beta:
+        description: "Fusionner beta -> main avant build/release"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Optional merge beta into main (keep main README)
+        if: ${{ inputs.merge_beta }}
+        shell: pwsh
+        run: |
+          git fetch origin main beta --tags
+          git checkout main
+          git pull --ff-only origin main
+
+          git merge --no-ff --no-commit origin/beta
+          git checkout --ours -- README.md
+          git add README.md
+
+          $unmerged = git diff --name-only --diff-filter=U
+          if ($unmerged) {
+            Write-Host "Conflits restants:"
+            Write-Host $unmerged
+            throw "Merge interrompu: conflits non résolus."
+          }
+
+          $pending = git status --porcelain
+          if ($pending) {
+            git commit -m "release: promote beta to main (keep main README)"
+            git push origin main
+          } else {
+            Write-Host "Aucun changement à merger vers main."
+          }
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Build fat JAR
+        run: mvn -B -DskipTests clean package
+
+      - name: Install Launch4j
+        run: choco install launch4j -y --no-progress
+
+      - name: Build EXE with Launch4j
+        shell: pwsh
+        run: |
+          $ws = "${{ github.workspace }}"
+          $jarPath = Join-Path $ws "target\ZokkymonLauncher.jar"
+          $exePath = Join-Path $ws "ZokkymonLauncher.exe"
+          $iconPath = Join-Path $ws "zokkymon.ico"
+          $cfgPath = Join-Path $ws "launch4j-ci.xml"
+
+          if (!(Test-Path $jarPath)) { throw "JAR introuvable: $jarPath" }
+
+          $xml = @"
+          <?xml version="1.0" encoding="UTF-8"?>
+          <launch4jConfig>
+            <dontWrapJar>false</dontWrapJar>
+            <headerType>gui</headerType>
+            <jar>$jarPath</jar>
+            <outfile>$exePath</outfile>
+            <errTitle>Java requis - ZokkymonLauncher</errTitle>
+            <cmdLine></cmdLine>
+            <chdir>.</chdir>
+            <priority>normal</priority>
+            <downloadUrl>https://adoptium.net/temurin/releases/?version=21</downloadUrl>
+            <supportUrl>https://adoptium.net/temurin/releases/?version=21</supportUrl>
+            <stayAlive>true</stayAlive>
+            <restartOnCrash>true</restartOnCrash>
+            <manifest></manifest>
+            <icon>$iconPath</icon>
+            <jre>
+              <path>%USERPROFILE%\\.zokkymon\\Jre_21</path>
+              <requiresJdk>false</requiresJdk>
+              <requires64Bit>true</requires64Bit>
+              <minVersion>21.0.0</minVersion>
+              <maxVersion></maxVersion>
+            </jre>
+          </launch4jConfig>
+          "@
+
+          Set-Content -Path $cfgPath -Value $xml -Encoding UTF8
+          launch4jc $cfgPath
+
+          if (!(Test-Path $exePath)) { throw "EXE non généré: $exePath" }
+
+      - name: Prepare stable release notes
+        shell: pwsh
+        run: |
+          $pendingPath = "release-notes/pending-main.md"
+          $outPath = "release-notes/generated-main.md"
+
+          $pending = ""
+          if (Test-Path $pendingPath) {
+            $pending = Get-Content $pendingPath -Raw
+          }
+
+          if ([string]::IsNullOrWhiteSpace($pending)) {
+            $pending = "## Release stable`n`nAucune note manuelle fournie."
+          }
+
+          Set-Content -Path $outPath -Value $pending -Encoding UTF8
+
+      - name: Create GitHub release (stable)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.stable_version }}
+          name: v${{ inputs.stable_version }}
+          target_commitish: main
+          prerelease: false
+          body_path: release-notes/generated-main.md
+          files: ZokkymonLauncher.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
