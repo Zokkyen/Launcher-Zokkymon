@@ -70,7 +70,7 @@ jobs:
         run: mvn -B -DskipTests clean package
 
       - name: Install Launch4j
-        run: choco install launch4j --version=3.50 -y --no-progress
+        run: choco install launch4j -y --no-progress
 
       - name: Setup Java 8 (required by Launch4j)
         uses: actions/setup-java@v4
