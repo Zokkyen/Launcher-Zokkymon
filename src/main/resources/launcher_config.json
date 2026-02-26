@@ -2,7 +2,7 @@
   "modpackInfoUrl": "https://zokkyen-cobblemon.ddns.net/modpack/info.json",
   "installPath": "",
   "enableVersionCheck": true,
-  "launcherVersion": "0.1.0",
+  "launcherVersion": "0.2.0",
   "serverUrl": "https://zokkyen-cobblemon.ddns.net",
   "launcherInfoUrl": "https://raw.githubusercontent.com/Zokkyen/Launcher-Zokkymon/beta/info.json",
   "modpackName": "Zokkymon",
