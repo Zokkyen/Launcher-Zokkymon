@@ -194,6 +194,7 @@ jobs:
           name: v${{ inputs.stable_version }}
           target_commitish: main
           prerelease: false
+          make_latest: true
           body_path: release-notes/generated-main.md
           files: ZokkymonLauncher.exe
         env:
