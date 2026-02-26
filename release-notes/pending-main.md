@@ -1,4 +1,4 @@
-## 🚀 Notes de version stable (à compléter avant promotion)
+## 🚀 Notes de version stable
 
 - Nouveautés :
   - Interface paramètres harmonisée avec libellés FR pour les profils de performances et le canal d'update

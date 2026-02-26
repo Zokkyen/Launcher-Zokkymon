@@ -1,4 +1,4 @@
-## 🧪 Notes beta (à compléter avant push)
+## 🧪 Notes beta
 
 - Nouveautés launcher :
 	- Profils de performances en français (Performance, Qualité, PC modeste, Personnalisé)
