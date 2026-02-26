@@ -81,6 +81,8 @@ Ce launcher n’est pas affilié aux créateurs officiels du modpack.
 - Les versions stables arrivent ensuite sur **main** (celle recommandée pour tout le monde).
 - À chaque release, l’EXE et les infos de version sont publiés automatiquement.
 
+Pour les détails techniques (workflows, CI/CD, process de release), voir la branche **beta**.
+
 ---
 
 ## ⚠️ Disclaimer
