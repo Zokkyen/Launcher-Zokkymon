@@ -353,6 +353,43 @@ public class Updater {
         }
     }
 
+    private String resolveLauncherExecutablePath(String exeName) {
+        try {
+            String classpath = System.getProperty("java.class.path", "");
+            if (!classpath.isBlank()) {
+                String[] entries = classpath.split(java.io.File.pathSeparator);
+                for (String entry : entries) {
+                    if (entry == null) continue;
+                    String trimmed = entry.trim();
+                    if (trimmed.toLowerCase().endsWith(".exe")) {
+                        File cpExe = new File(trimmed);
+                        if (cpExe.exists()) return cpExe.getAbsolutePath();
+                    }
+                }
+            }
+
+            var commandOpt = ProcessHandle.current().info().command();
+            if (commandOpt.isPresent()) {
+                String cmd = commandOpt.get();
+                if (cmd != null && cmd.toLowerCase().endsWith(".exe")) {
+                    File cmdExe = new File(cmd);
+                    if (cmdExe.exists()) return cmdExe.getAbsolutePath();
+                }
+            }
+        } catch (Exception ignored) {}
+
+        String launcherDir = new File(System.getProperty("user.dir", ".")).getAbsolutePath();
+        File launcherFile = new File(launcherDir, exeName);
+        if (!launcherFile.exists()) {
+            File parent = new File(launcherDir).getParentFile();
+            if (parent != null) {
+                File parentCandidate = new File(parent, exeName);
+                if (parentCandidate.exists()) launcherFile = parentCandidate;
+            }
+        }
+        return launcherFile.getAbsolutePath();
+    }
+
     public boolean downloadAndInstallLauncher(JSONObject info) {
         try {
             String url = info.getString("url");
@@ -371,27 +408,19 @@ public class Updater {
                     gui.appendLog("[ERR] Hash invalide pour le launcher téléchargé.");
                     gui.appendLog("   Attendu : " + expectedHash);
                     gui.appendLog("   Calculé : " + actualLauncherHash);
+                    gui.appendLog("   Mise à jour annulée pour éviter un remplacement invalide.");
+                    downloaded.delete();
+                    return false;
                 }
             }
 
             // Lancer un processus discret pour remplacer et relancer le launcher
             String exeName = config.getLauncherExeName();
-            
-            // Trouver le chemin du launcher EXE en cours d'exécution
-            String launcherDir = System.getProperty("user.dir");
-            File launcherFile = new File(launcherDir, exeName);
-            
-            if (!launcherFile.exists()) {
-                launcherFile = new File(new File(launcherDir).getParent(), exeName);
-            }
-            if (!launcherFile.exists()) {
-                launcherDir = new File(System.getProperty("user.dir")).getAbsolutePath();
-            } else {
-                launcherDir = launcherFile.getParent();
-            }
-            
             String newLauncherPath = new File(base, "new_launcher.exe").getAbsolutePath();
-            String targetLauncherPath = new File(launcherDir, exeName).getAbsolutePath();
+            String targetLauncherPath = resolveLauncherExecutablePath(exeName);
+
+            gui.appendLog("[*] EXE source update : " + newLauncherPath);
+            gui.appendLog("[*] EXE cible à remplacer : " + targetLauncherPath);
 
             // Créer un script PowerShell qui remplace et relance silencieusement
             File ps = new File(base, "update_launcher.ps1");

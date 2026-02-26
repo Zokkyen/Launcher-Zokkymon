@@ -125,9 +125,17 @@ public class ConfigManager {
         }
     }
 
-    // ── Getters JAR — lecture seule, non modifiables par l'utilisateur ─────────
+    // ── Getters JAR / runtime ───────────────────────────────────────────────────
 
-    public String getLauncherVersion()  { return jarConfig.optString("launcherVersion", "0.1.0"); }
+    public String getLauncherVersion()  {
+        String embedded = jarConfig.optString("launcherVersion", "0.1.0").trim();
+        String local = userConfig.optString("launcherVersionLocal", "").trim();
+
+        if (embedded.isBlank()) embedded = "0.1.0";
+        if (local.isBlank()) return embedded;
+
+        return compareVersions(local, embedded) > 0 ? local : embedded;
+    }
     public String getServerUrl()        { return jarConfig.optString("serverUrl", ""); }
     public String getMinecraftVersion() { return jarConfig.optString("minecraftVersion", "1.21.1"); }
     public String getFabricVersion()    { return jarConfig.optString("fabricVersion", "0.18.1"); }
@@ -203,11 +211,32 @@ public class ConfigManager {
         }
     }
 
-    /**
-     * No-op : la version du launcher est toujours celle du JAR.
-     * Conservé pour compatibilité avec Updater (auto-update via script PS).
-     */
-    public void setLauncherVersion(String version) {}
+    public void setLauncherVersion(String version) {
+        if (version == null) return;
+        String normalized = version.trim();
+        if (normalized.isBlank()) return;
+        userConfig.put("launcherVersionLocal", normalized);
+        saveConfig();
+    }
+
+    private int compareVersions(String a, String b) {
+        String[] pa = a.split("\\.");
+        String[] pb = b.split("\\.");
+        int len = Math.max(pa.length, pb.length);
+        for (int i = 0; i < len; i++) {
+            int va = i < pa.length ? parseVersionPart(pa[i]) : 0;
+            int vb = i < pb.length ? parseVersionPart(pb[i]) : 0;
+            if (va != vb) return Integer.compare(va, vb);
+        }
+        return 0;
+    }
+
+    private int parseVersionPart(String part) {
+        if (part == null) return 0;
+        String numeric = part.replaceAll("[^0-9]", "").trim();
+        if (numeric.isBlank()) return 0;
+        try { return Integer.parseInt(numeric); } catch (Exception e) { return 0; }
+    }
 
     // ── modpackToken : source JAR, copie chiffrée dans userConfig ─────────────
 
