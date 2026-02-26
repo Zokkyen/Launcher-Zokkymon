@@ -5,21 +5,21 @@
 <h1 align="center">Launcher Zokkymon</h1>
 
 <p align="center">
-Un launcher personnalisé créé par <b>Zokkyen</b> pour jouer entre amis à un modpack basé sur Cobblemon Academy 2.
+Un launcher fait maison par <b>Zokkyen</b> pour lancer Zokkymon facilement entre amis, sans prise de tête.
 </p>
 
 ---
 
 ## 🎮 À propos du projet
 
-**Launcher Zokkymon** est un projet personnel développé dans le but de jouer entre amis dans un environnement sécurisé et communautaire.
+**Launcher Zokkymon** est un projet perso/communautaire pour simplifier la vie des joueurs : tu installes, tu te connectes, tu joues.
 
 Ce launcher permet :
 
-- L'installation automatique du modpack
-- La gestion des mises à jour
-- Une connexion simplifiée au serveur
-- Une expérience optimisée pour notre communauté
+- D’installer automatiquement le modpack
+- De garder le jeu à jour
+- De se connecter simplement au serveur
+- D’avoir une expérience stable pour toute la communauté
 
 Il n’a **aucun objectif commercial**.
 
@@ -34,7 +34,7 @@ Créer un espace de jeu privé autour de **Cobblemon Academy 2**, avec :
 - Une gestion propre des versions
 - Un esprit communautaire
 
-Ce projet est développé uniquement pour le plaisir et le partage.
+Le but est simple : jouer ensemble dans de bonnes conditions, avec un launcher fiable et agréable à utiliser.
 
 ---
 
@@ -47,7 +47,7 @@ Le serveur fonctionne avec :
 - Vérification d’authentification officielle Microsoft/Minecraft
 - Distribution contrôlée du modpack
 
-L’objectif est de garantir :
+L’idée, c’est de garantir :
 
 - Une expérience sécurisée
 - Aucune usurpation d’identité
@@ -83,7 +83,7 @@ Ce projet :
 - N’a aucun but commercial.
 - Ne distribue aucun contenu payant.
 - Nécessite un compte Minecraft officiel valide.
-- Les images, pour le moment, sont générés par IA. Elles seront remplacées par la suite.
+- Les images sont, pour le moment, générées par IA et seront remplacées progressivement.
 
 ---
 
