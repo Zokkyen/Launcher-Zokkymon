@@ -1,6 +1,6 @@
 {
-  "version": "0.3.5",
-  "url": "https://github.com/Zokkyen/Launcher-Zokkymon/releases/download/v0.3.5/ZokkymonLauncher.exe",
-  "sha256": "cb5af98e3465f223f65b61bb84fcccdae4ec7b46e5fc74b15a3d59722a6d2c19",
-  "changelog": "## 🚀 Notes de version stable\r\n\r\n- Nouveautés :\r\n  - Interface paramètres harmonisée avec libellés FR pour les profils de performances et le canal d'update\r\n  - Feedback utilisateur clarifié pour les actions de sauvegarde/restauration de configuration joueur\r\n\r\n- Améliorations :\r\n  - Connexion Microsoft fiabilisée (erreurs explicites et vérifications de configuration)\r\n  - Canal par défaut consolidé sur `stable` pour les nouvelles configurations\r\n  - Build local EXE Windows renforcé (meilleurs diagnostics, exécution Launch4j plus robuste)\r\n\r\n- Correctifs :\r\n  - Correctifs de lancement Minecraft/Fabric (classpath, artefacts invalides, cache classpath)\r\n  - Réduction des conflits de dépendances (JSON/logging) pouvant provoquer des crashes au démarrage"
+  "version": "0.3.7",
+  "url": "https://github.com/Zokkyen/Launcher-Zokkymon/releases/download/v0.3.7/ZokkymonLauncher.exe",
+  "sha256": "1e55c83e8bf15430e6adad6ef6d0fdac33341a51d9dc70d85fbff838392ae3d5",
+  "changelog": "## 🚀 Notes de version stable (à compléter avant promotion)\r\n\r\n- Nouveautés :\r\n  - Interface paramètres harmonisée avec libellés FR pour les profils de performances et le canal d'update\r\n  - Feedback utilisateur clarifié pour les actions de sauvegarde/restauration de configuration joueur\r\n\r\n- Améliorations :\r\n  - Connexion Microsoft fiabilisée (erreurs explicites et vérifications de configuration)\r\n  - Canal par défaut consolidé sur `stable` pour les nouvelles configurations\r\n  - Build local EXE Windows renforcé (meilleurs diagnostics, exécution Launch4j plus robuste)\r\n\r\n- Correctifs :\r\n  - Correctifs de lancement Minecraft/Fabric (classpath, artefacts invalides, cache classpath)\r\n  - Réduction des conflits de dépendances (JSON/logging) pouvant provoquer des crashes au démarrage\r\n\r\n## ✅ Recommandé\r\n\r\n- Faire un backup de la configuration locale avant mise à jour."
 }
