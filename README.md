@@ -52,7 +52,6 @@ ZokkymonLauncher/
 │   ├── LauncherGUI.java        # UI Swing — fenêtre principale + dialogs
 │   ├── Launcher.java           # Lancement du processus Minecraft
 │   ├── Updater.java            # Vérification/téléchargement modpack et launcher
-│   ├── UpdaterService.java     # Orchestration des mises à jour
 │   ├── ConfigManager.java      # Lecture/écriture config JSON + profil MSA
 │   ├── MicrosoftAuth.java      # Flux d'auth Microsoft Device Code
 │   └── SecureStorage.java      # Chiffrement AES-256-GCM des tokens
