@@ -1,6 +1,6 @@
 {
-  "version": "0.3.1",
-  "url": "https://github.com/Zokkyen/Launcher-Zokkymon/releases/download/v0.3.1/ZokkymonLauncher.exe",
-  "sha256": "d2c211e51dc439aee2438a9c1f1b3f4312a8247174e1ec78bae8b32796558de7",
+  "version": "0.3.2",
+  "url": "https://github.com/Zokkyen/Launcher-Zokkymon/releases/download/v0.3.2/ZokkymonLauncher.exe",
+  "sha256": "9173dc86e0ecd37e54497847357d97285740833eb16e2dec49795ea40521d471",
   "changelog": "## 🚀 Zokkymon Launcher 0.3.1\r\n\r\n- Fiabilisation de la mise à jour automatique du launcher (ciblage EXE + persistance de version locale).\r\n- Correctifs CI/CD de release (build EXE Launch4j sur GitHub Actions, publication stable/beta plus robuste).\r\n- Mise à jour automatique de `info.json` directement dans les workflows de release (version, URL, SHA-256, changelog).\r\n- Documentation des processus de release clarifiée (`main` orienté utilisateur, `beta` orienté technique).\r\n\r\n## ✅ Recommandé\r\n\r\n- Faire un backup de la configuration locale avant mise à jour."
 }
