@@ -1,0 +1,11 @@
+{
+  "required": true,
+  "package": "com.zokkymon.splash.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "SplashOverlayMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

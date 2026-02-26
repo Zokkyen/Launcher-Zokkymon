@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "zokkymon_splash",
+  "version": "${version}",
+  "name": "Zokkymon Splash Screen",
+  "description": "Écran de chargement personnalisé Zokkymon",
+  "authors": ["Zokkymon"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.zokkymon.splash.ZokkySplashMod"
+    ]
+  },
+  "mixins": [
+    "zokkymon_splash.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.14.0",
+    "minecraft":    "~1.21.1"
+  }
+}
