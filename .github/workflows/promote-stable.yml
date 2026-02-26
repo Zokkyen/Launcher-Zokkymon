@@ -61,6 +61,22 @@ jobs:
             Write-Host "Aucun changement à merger vers main."
           }
 
+      - name: Stamp embedded launcher version (main)
+        shell: pwsh
+        run: |
+          $version = "${{ inputs.stable_version }}"
+          $infoUrl = "https://raw.githubusercontent.com/${{ github.repository }}/main/info.json"
+          $targets = @("config/launcher_config.json", "src/main/resources/launcher_config.json")
+
+          foreach ($path in $targets) {
+            if (!(Test-Path $path)) { continue }
+            $cfg = Get-Content $path -Raw | ConvertFrom-Json
+            $cfg.launcherVersion = $version
+            $cfg.launcherInfoUrl = $infoUrl
+            $json = $cfg | ConvertTo-Json -Depth 20
+            [System.IO.File]::WriteAllText((Resolve-Path $path), $json, [System.Text.UTF8Encoding]::new($false))
+          }
+
       - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
