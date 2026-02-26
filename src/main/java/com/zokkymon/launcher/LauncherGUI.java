@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.BlockingQueue;
@@ -1063,6 +1064,16 @@ public class LauncherGUI extends JFrame {
     }
 
     private void showMicrosoftLoginDialog(Runnable onSuccess) {
+        String clientId = config != null ? config.getClientId() : "";
+        if (clientId == null || clientId.isBlank()) {
+            JOptionPane.showMessageDialog(this,
+                "Connexion Microsoft indisponible : msaClientId non configuré dans launcher_config.json.",
+                "Connexion Microsoft",
+                JOptionPane.WARNING_MESSAGE);
+            appendLog("[MSA] Client ID absent: msaClientId non configuré.");
+            return;
+        }
+
         authActionBtn.setEnabled(false);
         appendLog("[MSA] Démarrage du Device Code Flow...");
         new Thread(() -> {
@@ -1071,115 +1082,125 @@ public class LauncherGUI extends JFrame {
                 dcr = MicrosoftAuth.requestDeviceCode();
             } catch (Exception ex) {
                 appendLog("[MSA] Erreur : " + ex.getMessage());
-                SwingUtilities.invokeLater(() -> authActionBtn.setEnabled(true));
+                SwingUtilities.invokeLater(() -> {
+                    JOptionPane.showMessageDialog(this,
+                        "Échec de la connexion Microsoft :\n" + ex.getMessage(),
+                        "Connexion Microsoft",
+                        JOptionPane.ERROR_MESSAGE);
+                    authActionBtn.setEnabled(true);
+                });
                 return;
             }
 
-            JDialog dialog = new JDialog(this, "Connexion Microsoft", true);
-            dialog.setSize(430, 285);
-            dialog.setLocationRelativeTo(this);
-            dialog.setResizable(false);
-            dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+            SwingUtilities.invokeLater(() -> openMicrosoftDeviceDialog(dcr, onSuccess));
+        }, "msa-device-code-start").start();
+    }
 
-            JPanel root = new JPanel(new GridBagLayout());
-            root.setBackground(new Color(25, 25, 30));
-            root.setBorder(new EmptyBorder(20, 24, 16, 24));
-            GridBagConstraints gc = new GridBagConstraints();
-            gc.insets  = new java.awt.Insets(4, 0, 4, 0);
-            gc.fill    = GridBagConstraints.HORIZONTAL;
-            gc.gridx   = 0;
-            gc.weightx = 1;
+    private void openMicrosoftDeviceDialog(MicrosoftAuth.DeviceCodeResult dcr, Runnable onSuccess) {
+        JDialog dialog = new JDialog(this, "Connexion Microsoft", true);
+        dialog.setSize(430, 285);
+        dialog.setLocationRelativeTo(this);
+        dialog.setResizable(false);
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
 
-            JLabel title = new JLabel("Connexion à votre compte Microsoft");
-            title.setFont(new Font("Segoe UI", Font.BOLD, 14));
-            title.setForeground(Color.WHITE);
-            title.setHorizontalAlignment(SwingConstants.CENTER);
-            gc.gridy = 0;
-            root.add(title, gc);
+        JPanel root = new JPanel(new GridBagLayout());
+        root.setBackground(new Color(25, 25, 30));
+        root.setBorder(new EmptyBorder(20, 24, 16, 24));
+        GridBagConstraints gc = new GridBagConstraints();
+        gc.insets  = new java.awt.Insets(4, 0, 4, 0);
+        gc.fill    = GridBagConstraints.HORIZONTAL;
+        gc.gridx   = 0;
+        gc.weightx = 1;
 
-            JLabel instr = new JLabel("<html><center>Ouvrez <b style='color:#3b82f6'>" + dcr.verificationUri
-                + "</b><br>et saisissez le code ci-dessous&nbsp;:</center></html>");
-            instr.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-            instr.setForeground(new Color(200, 200, 200));
-            instr.setHorizontalAlignment(SwingConstants.CENTER);
-            gc.gridy = 1; gc.insets = new java.awt.Insets(4, 0, 8, 0);
-            root.add(instr, gc);
+        JLabel title = new JLabel("Connexion à votre compte Microsoft");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        title.setForeground(Color.WHITE);
+        title.setHorizontalAlignment(SwingConstants.CENTER);
+        gc.gridy = 0;
+        root.add(title, gc);
 
-            JLabel codeLabel = new JLabel(dcr.userCode);
-            codeLabel.setFont(new Font("Consolas", Font.BOLD, 28));
-            codeLabel.setForeground(ACCENT);
-            codeLabel.setHorizontalAlignment(SwingConstants.CENTER);
-            codeLabel.setBorder(javax.swing.BorderFactory.createCompoundBorder(
-                javax.swing.BorderFactory.createLineBorder(ACCENT, 1, true),
-                new EmptyBorder(6, 16, 6, 16)
-            ));
-            gc.gridy = 2; gc.insets = new java.awt.Insets(0, 40, 8, 40);
-            root.add(codeLabel, gc);
+        JLabel instr = new JLabel("<html><center>Ouvrez <b style='color:#3b82f6'>" + dcr.verificationUri
+            + "</b><br>et saisissez le code ci-dessous&nbsp;:</center></html>");
+        instr.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        instr.setForeground(new Color(200, 200, 200));
+        instr.setHorizontalAlignment(SwingConstants.CENTER);
+        gc.gridy = 1; gc.insets = new java.awt.Insets(4, 0, 8, 0);
+        root.add(instr, gc);
 
-            JPanel btns = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 10, 0));
-            btns.setOpaque(false);
-            JButton copyBtn   = mkButton("Copier le code", new Color(50, 50, 55), Color.WHITE, 12, 32);
-            JButton openBtn   = mkButton("Ouvrir", new Color(50, 50, 55), Color.WHITE, 12, 32);
-            JButton cancelBtn = mkButton("Annuler", new Color(50, 50, 55), Color.WHITE, 12, 32);
-            btns.add(copyBtn); btns.add(openBtn); btns.add(cancelBtn);
-            
-            copyBtn.addActionListener(ev -> {
-                java.awt.Toolkit.getDefaultToolkit().getSystemClipboard()
-                    .setContents(new java.awt.datatransfer.StringSelection(dcr.userCode), null);
-                copyBtn.setText("\u2713 Copié !");
-            });
-            openBtn.addActionListener(ev -> {
-                try { java.awt.Desktop.getDesktop().browse(new java.net.URI(dcr.verificationUri)); }
-                catch (Exception ignored) {}
-            });
-            gc.gridy = 3; gc.insets = new java.awt.Insets(4, 0, 0, 0);
-            root.add(btns, gc);
+        JLabel codeLabel = new JLabel(dcr.userCode);
+        codeLabel.setFont(new Font("Consolas", Font.BOLD, 28));
+        codeLabel.setForeground(ACCENT);
+        codeLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        codeLabel.setBorder(javax.swing.BorderFactory.createCompoundBorder(
+            javax.swing.BorderFactory.createLineBorder(ACCENT, 1, true),
+            new EmptyBorder(6, 16, 6, 16)
+        ));
+        gc.gridy = 2; gc.insets = new java.awt.Insets(0, 40, 8, 40);
+        root.add(codeLabel, gc);
 
-            JLabel pollLbl = new JLabel("En attente de votre validation...");
-            pollLbl.setFont(new Font("Segoe UI", Font.ITALIC, 11));
-            pollLbl.setForeground(new Color(150, 150, 150));
-            pollLbl.setHorizontalAlignment(SwingConstants.CENTER);
-            gc.gridy = 4; gc.insets = new java.awt.Insets(8, 0, 0, 0);
-            root.add(pollLbl, gc);
+        JPanel btns = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 10, 0));
+        btns.setOpaque(false);
+        JButton copyBtn   = mkButton("Copier le code", new Color(50, 50, 55), Color.WHITE, 12, 32);
+        JButton openBtn   = mkButton("Ouvrir", new Color(50, 50, 55), Color.WHITE, 12, 32);
+        JButton cancelBtn = mkButton("Annuler", new Color(50, 50, 55), Color.WHITE, 12, 32);
+        btns.add(copyBtn); btns.add(openBtn); btns.add(cancelBtn);
 
-            dialog.setContentPane(root);
+        copyBtn.addActionListener(ev -> {
+            java.awt.Toolkit.getDefaultToolkit().getSystemClipboard()
+                .setContents(new java.awt.datatransfer.StringSelection(dcr.userCode), null);
+            copyBtn.setText("\u2713 Copié !");
+        });
+        openBtn.addActionListener(ev -> {
+            try { java.awt.Desktop.getDesktop().browse(new java.net.URI(dcr.verificationUri)); }
+            catch (Exception ignored) {}
+        });
+        gc.gridy = 3; gc.insets = new java.awt.Insets(4, 0, 0, 0);
+        root.add(btns, gc);
 
-            boolean[] cancelled = {false};
-            cancelBtn.addActionListener(ev -> { cancelled[0] = true; dialog.dispose(); });
-            dialog.addWindowListener(new java.awt.event.WindowAdapter() {
-                @Override public void windowClosing(java.awt.event.WindowEvent ev) { cancelled[0] = true; }
-            });
+        JLabel pollLbl = new JLabel("En attente de votre validation...");
+        pollLbl.setFont(new Font("Segoe UI", Font.ITALIC, 11));
+        pollLbl.setForeground(new Color(150, 150, 150));
+        pollLbl.setHorizontalAlignment(SwingConstants.CENTER);
+        gc.gridy = 4; gc.insets = new java.awt.Insets(8, 0, 0, 0);
+        root.add(pollLbl, gc);
 
-            new Thread(() -> {
-                try {
-                    MicrosoftAuth.McProfile profile = MicrosoftAuth.pollAndAuthenticate(dcr, () -> cancelled[0]);
-                    config.saveMsaProfile(profile);
-                    appendLog("[MSA] Connecté en tant que : " + profile.username);
-                    updateAuthCard(profile);
-                    SwingUtilities.invokeLater(() -> {
-                        pollLbl.setText("\u2713 Connecté : " + profile.username);
-                        pollLbl.setForeground(new Color(52, 211, 153));
-                    });
-                    Thread.sleep(800);
-                    SwingUtilities.invokeLater(() -> {
-                        dialog.dispose();
-                        if (onSuccess != null) onSuccess.run();
-                    });
-                } catch (InterruptedException ignored) {
-                    appendLog("[MSA] Connexion annulée.");
-                } catch (Exception ex) {
-                    appendLog("[MSA] Erreur : " + ex.getMessage());
-                    SwingUtilities.invokeLater(() -> {
-                        pollLbl.setText("Erreur : " + ex.getMessage());
-                        pollLbl.setForeground(new Color(239, 68, 68));
-                    });
-                } finally {
-                    SwingUtilities.invokeLater(() -> authActionBtn.setEnabled(true));
-                }
-            }).start();
+        dialog.setContentPane(root);
 
-            dialog.setVisible(true);
-        }).start();
+        boolean[] cancelled = {false};
+        cancelBtn.addActionListener(ev -> { cancelled[0] = true; dialog.dispose(); });
+        dialog.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override public void windowClosing(java.awt.event.WindowEvent ev) { cancelled[0] = true; }
+        });
+
+        new Thread(() -> {
+            try {
+                MicrosoftAuth.McProfile profile = MicrosoftAuth.pollAndAuthenticate(dcr, () -> cancelled[0]);
+                config.saveMsaProfile(profile);
+                appendLog("[MSA] Connecté en tant que : " + profile.username);
+                updateAuthCard(profile);
+                SwingUtilities.invokeLater(() -> {
+                    pollLbl.setText("\u2713 Connecté : " + profile.username);
+                    pollLbl.setForeground(new Color(52, 211, 153));
+                });
+                Thread.sleep(800);
+                SwingUtilities.invokeLater(() -> {
+                    dialog.dispose();
+                    if (onSuccess != null) onSuccess.run();
+                });
+            } catch (InterruptedException ignored) {
+                appendLog("[MSA] Connexion annulée.");
+            } catch (Exception ex) {
+                appendLog("[MSA] Erreur : " + ex.getMessage());
+                SwingUtilities.invokeLater(() -> {
+                    pollLbl.setText("Erreur : " + ex.getMessage());
+                    pollLbl.setForeground(new Color(239, 68, 68));
+                });
+            } finally {
+                SwingUtilities.invokeLater(() -> authActionBtn.setEnabled(true));
+            }
+        }, "msa-device-code-poll").start();
+
+        dialog.setVisible(true);
     }
 
     private JPanel infoCard(String title, JLabel valueLabel) {
@@ -1888,6 +1909,10 @@ public class LauncherGUI extends JFrame {
             File gameDir = findLatestInstalledModpackDir();
             if (gameDir == null) {
                 appendLog("[Backup] Aucun modpack installé détecté.");
+                JOptionPane.showMessageDialog(this,
+                    "Aucun modpack installé détecté.\nInstalle ou lance d'abord le modpack, puis réessaie.",
+                    "Sauvegarde configs joueur",
+                    JOptionPane.WARNING_MESSAGE);
                 return;
             }
 
@@ -1916,9 +1941,21 @@ public class LauncherGUI extends JFrame {
                 }
             }
 
+            if (copied == 0) {
+                appendLog("[Backup] Aucune config joueur trouvée à sauvegarder dans: " + gameDir.getAbsolutePath());
+                JOptionPane.showMessageDialog(this,
+                    "Aucun élément joueur trouvé à sauvegarder.\n"
+                    + "Éléments attendus : options.txt, optionsof.txt, keybindings.txt, shaderpacks/, resourcepacks/",
+                    "Sauvegarde configs joueur",
+                    JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+
             appendLog("[Backup] Sauvegarde configs joueur terminée: " + backupDir.getAbsolutePath() + " (" + copied + " élément(s)).");
             JOptionPane.showMessageDialog(this,
-                "Sauvegarde terminée dans :\n" + backupDir.getAbsolutePath(),
+                "Sauvegarde terminée dans :\n" + backupDir.getAbsolutePath()
+                + "\n\nÉléments inclus : options.txt, optionsof.txt, keybindings.txt, shaderpacks/, resourcepacks/"
+                + "\nNombre d'éléments copiés : " + copied,
                 "Sauvegarde configs joueur",
                 JOptionPane.INFORMATION_MESSAGE);
         } catch (Exception e) {
@@ -1935,6 +1972,10 @@ public class LauncherGUI extends JFrame {
             File gameDir = findLatestInstalledModpackDir();
             if (gameDir == null) {
                 appendLog("[Backup] Aucun modpack installé détecté.");
+                JOptionPane.showMessageDialog(this,
+                    "Aucun modpack installé détecté.\nInstalle ou lance d'abord le modpack, puis réessaie.",
+                    "Restauration configs joueur",
+                    JOptionPane.WARNING_MESSAGE);
                 return;
             }
             File backupRoot = getPlayerConfigBackupRoot();
@@ -2585,60 +2626,7 @@ public class LauncherGUI extends JFrame {
         cRam.setSelectedItem(config.getRamAllocation());
         cRam.setForeground(TEXT);
         cRam.setBorder(BorderFactory.createLineBorder(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80), 1));
-        cRam.setUI(new javax.swing.plaf.basic.BasicComboBoxUI() {
-            @Override
-            protected JButton createArrowButton() {
-                JButton btn = new JButton() {
-                    @Override protected void paintComponent(Graphics g) {
-                        Graphics2D g2 = (Graphics2D) g.create();
-                        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                        g2.setColor(CARD_BG);
-                        g2.fillRect(0, 0, getWidth(), getHeight());
-                        g2.setColor(ACCENT);
-                        int cx = getWidth() / 2, cy = getHeight() / 2;
-                        int[] xp = {cx - 4, cx + 4, cx};
-                        int[] yp = {cy - 2, cy - 2, cy + 3};
-                        g2.fillPolygon(xp, yp, 3);
-                        g2.dispose();
-                    }
-                };
-                btn.setBorder(BorderFactory.createEmptyBorder());
-                btn.setFocusPainted(false);
-                btn.setContentAreaFilled(false);
-                return btn;
-            }
-            @Override
-            public void installUI(JComponent c) {
-                super.installUI(c);
-                comboBox.setBackground(CARD_BG);
-            }
-            @Override
-            public void paintCurrentValueBackground(Graphics g, Rectangle bounds, boolean hasFocus) {
-                g.setColor(CARD_BG);
-                g.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
-            }
-            @Override
-            public void paintCurrentValue(Graphics g, Rectangle bounds, boolean hasFocus) {
-                ListCellRenderer<Object> renderer = comboBox.getRenderer();
-                Component comp = renderer.getListCellRendererComponent(
-                        listBox, comboBox.getSelectedItem(), -1, false, false);
-                comp.setBackground(CARD_BG);
-                comp.setForeground(TEXT);
-                currentValuePane.paintComponent(g, comp, comboBox,
-                        bounds.x, bounds.y, bounds.width, bounds.height, false);
-            }
-        });
-        cRam.setRenderer(new DefaultListCellRenderer() {
-            @Override
-            public Component getListCellRendererComponent(JList<?> list, Object value,
-                    int index, boolean isSelected, boolean cellHasFocus) {
-                JLabel lbl = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-                lbl.setBackground(isSelected ? SIDEBAR1 : CARD_BG);
-                lbl.setForeground(isSelected ? ACCENT : TEXT);
-                lbl.setBorder(new EmptyBorder(4, 10, 4, 10));
-                return lbl;
-            }
-        });
+        applySettingsComboTheme(cRam);
         panel.add(cRam, c);
 
         c.gridx = 0; c.gridy = 2;
@@ -2756,25 +2744,27 @@ public class LauncherGUI extends JFrame {
         panel.add(lblChannel, c);
         c.gridx = 1;
 
-        JComboBox<String> cChannel = new JComboBox<>(new String[]{"stable", "beta"});
-        cChannel.setSelectedItem(config.getLauncherChannel());
+        JComboBox<String> cChannel = new JComboBox<>(new String[]{"Stable", "Bêta"});
+        cChannel.setSelectedItem(toChannelLabel(config.getLauncherChannel()));
         cChannel.setForeground(TEXT);
         cChannel.setBackground(CARD_BG);
         cChannel.setBorder(BorderFactory.createLineBorder(
             new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80), 1));
+        applySettingsComboTheme(cChannel);
         panel.add(cChannel, c);
 
         c.gridx = 0; c.gridy = 1; c.fill = GridBagConstraints.NONE; c.weightx = 0;
-        JLabel lblProfile = settingsLbl("Profil intelligent");
+        JLabel lblProfile = settingsLbl("Profil de performances");
         panel.add(lblProfile, c);
         c.gridx = 1;
 
-        JComboBox<String> cProfile = new JComboBox<>(new String[]{"performance", "quality", "low-end", "custom"});
-        cProfile.setSelectedItem(config.getLaunchProfile());
+        JComboBox<String> cProfile = new JComboBox<>(new String[]{"Performance", "Qualité", "PC modeste", "Personnalisé"});
+        cProfile.setSelectedItem(toProfileLabel(config.getLaunchProfile()));
         cProfile.setForeground(TEXT);
         cProfile.setBackground(CARD_BG);
         cProfile.setBorder(BorderFactory.createLineBorder(
             new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80), 1));
+        applySettingsComboTheme(cProfile);
         panel.add(cProfile, c);
 
         c.gridx = 0; c.gridy = 5; c.fill = GridBagConstraints.NONE; c.weightx = 0;
@@ -2883,6 +2873,8 @@ public class LauncherGUI extends JFrame {
         backupCfgBtn.addActionListener(e -> backupPlayerConfigs());
         JButton restoreCfgBtn = mkButton("Restaurer dernière", CARD_BG, TEXT, 10, 30);
         restoreCfgBtn.addActionListener(e -> restoreLatestPlayerConfigsBackup());
+        applySettingsButtonEffects(backupCfgBtn);
+        applySettingsButtonEffects(restoreCfgBtn);
         backupCfgBtn.setPreferredSize(new Dimension(170, 30));
         restoreCfgBtn.setPreferredSize(new Dimension(170, 30));
 
@@ -2988,26 +2980,30 @@ public class LauncherGUI extends JFrame {
         UIManager.put("OptionPane.messageForeground", null);
 
         if (result[0] == JOptionPane.OK_OPTION) {
-            String selectedProfile = (String) cProfile.getSelectedItem();
-            if (selectedProfile == null) selectedProfile = "performance";
+            String selectedProfileLabel = (String) cProfile.getSelectedItem();
+            String selectedProfile = toProfileKey(selectedProfileLabel);
             config.setLaunchProfile(selectedProfile);
 
             if ("custom".equals(selectedProfile)) {
                 config.setRamAllocation((String) cRam.getSelectedItem());
                 config.setCustomJvmArgs(fJvmArgs.getText());
+                appendLog("[Profil] Mode personnalisé enregistré.");
             } else {
                 applyLaunchProfilePreset(selectedProfile);
-                appendLog("[Profil] Preset appliqué : " + selectedProfile);
+                appendLog("[Profil] Preset appliqué : " + (selectedProfileLabel == null ? "Performance" : selectedProfileLabel));
             }
 
             config.setInstallPath(fPath.getText());
             String oldChannel = config.getLauncherChannel();
-            String newChannel = (String) cChannel.getSelectedItem();
-            if (newChannel != null && !newChannel.equals(oldChannel)) {
+            String newChannelLabel = (String) cChannel.getSelectedItem();
+            String newChannel = toChannelKey(newChannelLabel);
+            if (!newChannel.equals(oldChannel)) {
                 config.setLauncherChannel(newChannel);
                 cachedLauncherStatus = null;
                 cachedLauncherNewVer = null;
-                appendLog("[Canal] Canal de mise à jour changé : " + oldChannel + " -> " + newChannel);
+                appendLog("[Canal] Canal de mise à jour changé : "
+                    + toChannelLabel(oldChannel) + " -> "
+                    + (newChannelLabel == null ? "Stable" : newChannelLabel));
                 new Thread(this::startBackgroundChecks).start();
             }
             // Sauvegarder la résolution
@@ -3117,6 +3113,155 @@ public class LauncherGUI extends JFrame {
         btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
         btn.setPreferredSize(new Dimension(btn.getPreferredSize().width + 20, h));
         return btn;
+    }
+
+    private Color blend(Color base, Color accent, float ratio) {
+        float r = Math.max(0f, Math.min(1f, ratio));
+        int red = Math.round(base.getRed() * (1f - r) + accent.getRed() * r);
+        int green = Math.round(base.getGreen() * (1f - r) + accent.getGreen() * r);
+        int blue = Math.round(base.getBlue() * (1f - r) + accent.getBlue() * r);
+        return new Color(red, green, blue);
+    }
+
+    private void applySettingsComboTheme(JComboBox<?> combo) {
+        combo.setUI(new javax.swing.plaf.basic.BasicComboBoxUI() {
+            @Override
+            protected JButton createArrowButton() {
+                JButton btn = new JButton() {
+                    @Override protected void paintComponent(Graphics g) {
+                        Graphics2D g2 = (Graphics2D) g.create();
+                        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                        g2.setColor(CARD_BG);
+                        g2.fillRect(0, 0, getWidth(), getHeight());
+                        g2.setColor(ACCENT);
+                        int cx = getWidth() / 2;
+                        int cy = getHeight() / 2;
+                        int[] xp = {cx - 4, cx + 4, cx};
+                        int[] yp = {cy - 2, cy - 2, cy + 3};
+                        g2.fillPolygon(xp, yp, 3);
+                        g2.dispose();
+                    }
+                };
+                btn.setBorder(BorderFactory.createEmptyBorder());
+                btn.setFocusPainted(false);
+                btn.setContentAreaFilled(false);
+                return btn;
+            }
+
+            @Override
+            public void installUI(JComponent c) {
+                super.installUI(c);
+                comboBox.setBackground(CARD_BG);
+            }
+
+            @Override
+            public void paintCurrentValueBackground(Graphics g, Rectangle bounds, boolean hasFocus) {
+                g.setColor(CARD_BG);
+                g.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
+            }
+
+            @Override
+            public void paintCurrentValue(Graphics g, Rectangle bounds, boolean hasFocus) {
+                ListCellRenderer<Object> renderer = comboBox.getRenderer();
+                Component comp = renderer.getListCellRendererComponent(
+                    listBox, comboBox.getSelectedItem(), -1, false, false);
+                comp.setBackground(CARD_BG);
+                comp.setForeground(TEXT);
+                currentValuePane.paintComponent(g, comp, comboBox,
+                    bounds.x, bounds.y, bounds.width, bounds.height, false);
+            }
+        });
+
+        combo.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value,
+                    int index, boolean isSelected, boolean cellHasFocus) {
+                JLabel lbl = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                lbl.setBackground(isSelected ? SIDEBAR1 : CARD_BG);
+                lbl.setForeground(isSelected ? ACCENT : TEXT);
+                lbl.setBorder(new EmptyBorder(4, 10, 4, 10));
+                return lbl;
+            }
+        });
+    }
+
+    private String toProfileLabel(String profileKey) {
+        return switch (profileKey == null ? "" : profileKey.toLowerCase(Locale.ROOT).trim()) {
+            case "quality", "qualite" -> "Qualité";
+            case "low-end", "lowend" -> "PC modeste";
+            case "custom" -> "Personnalisé";
+            default -> "Performance";
+        };
+    }
+
+    private String toChannelLabel(String channelKey) {
+        return switch (channelKey == null ? "" : channelKey.toLowerCase(Locale.ROOT).trim()) {
+            case "beta", "bêta", "béta" -> "Bêta";
+            default -> "Stable";
+        };
+    }
+
+    private String toChannelKey(String channelLabel) {
+        return switch (channelLabel == null ? "" : channelLabel.toLowerCase(Locale.ROOT).trim()) {
+            case "bêta", "beta", "béta" -> "beta";
+            default -> "stable";
+        };
+    }
+
+    private String toProfileKey(String profileLabel) {
+        return switch (profileLabel == null ? "" : profileLabel.toLowerCase(Locale.ROOT).trim()) {
+            case "qualité", "qualite" -> "quality";
+            case "pc modeste" -> "low-end";
+            case "personnalisé", "personnalise" -> "custom";
+            default -> "performance";
+        };
+    }
+
+    private void applySettingsButtonEffects(JButton button) {
+        button.addMouseListener(new MouseAdapter() {
+            private boolean pressed;
+
+            private void applyBase() {
+                button.setBackground(CARD_BG);
+                button.repaint();
+            }
+
+            private void applyHover() {
+                button.setBackground(blend(CARD_BG, ACCENT, 0.16f));
+                button.repaint();
+            }
+
+            private void applyPressed() {
+                button.setBackground(blend(CARD_BG, ACCENT, 0.30f));
+                button.repaint();
+            }
+
+            @Override public void mouseEntered(MouseEvent e) {
+                if (!button.isEnabled()) return;
+                if (!pressed) applyHover();
+            }
+
+            @Override public void mouseExited(MouseEvent e) {
+                if (!button.isEnabled()) return;
+                pressed = false;
+                applyBase();
+            }
+
+            @Override public void mousePressed(MouseEvent e) {
+                if (!button.isEnabled()) return;
+                if (SwingUtilities.isLeftMouseButton(e)) {
+                    pressed = true;
+                    applyPressed();
+                }
+            }
+
+            @Override public void mouseReleased(MouseEvent e) {
+                if (!button.isEnabled()) return;
+                pressed = false;
+                if (button.contains(e.getPoint())) applyHover();
+                else applyBase();
+            }
+        });
     }
 
     private JLabel infoVal(String text) {

@@ -1,6 +1,6 @@
 {
-  "version": "0.3.3",
-  "url": "https://github.com/Zokkyen/Launcher-Zokkymon/releases/download/v0.3.3/ZokkymonLauncher.exe",
-  "sha256": "c94c1c6c0e6b5afbd46752f15bc436688f65c3de27d8ea7b20413dae443d62f8",
-  "changelog": "## 🚀 Zokkymon Launcher 0.3.1\r\n\r\n- Fiabilisation de la mise à jour automatique du launcher (ciblage EXE + persistance de version locale).\r\n- Correctifs CI/CD de release (build EXE Launch4j sur GitHub Actions, publication stable/beta plus robuste).\r\n- Mise à jour automatique de `info.json` directement dans les workflows de release (version, URL, SHA-256, changelog).\r\n- Documentation des processus de release clarifiée (`main` orienté utilisateur, `beta` orienté technique).\r\n\r\n## ✅ Recommandé\r\n\r\n- Faire un backup de la configuration locale avant mise à jour."
+  "version": "0.3.5",
+  "url": "https://github.com/Zokkyen/Launcher-Zokkymon/releases/download/v0.3.5/ZokkymonLauncher.exe",
+  "sha256": "cb5af98e3465f223f65b61bb84fcccdae4ec7b46e5fc74b15a3d59722a6d2c19",
+  "changelog": "## 🚀 Notes de version stable\r\n\r\n- Nouveautés :\r\n  - Interface paramètres harmonisée avec libellés FR pour les profils de performances et le canal d'update\r\n  - Feedback utilisateur clarifié pour les actions de sauvegarde/restauration de configuration joueur\r\n\r\n- Améliorations :\r\n  - Connexion Microsoft fiabilisée (erreurs explicites et vérifications de configuration)\r\n  - Canal par défaut consolidé sur `stable` pour les nouvelles configurations\r\n  - Build local EXE Windows renforcé (meilleurs diagnostics, exécution Launch4j plus robuste)\r\n\r\n- Correctifs :\r\n  - Correctifs de lancement Minecraft/Fabric (classpath, artefacts invalides, cache classpath)\r\n  - Réduction des conflits de dépendances (JSON/logging) pouvant provoquer des crashes au démarrage"
 }

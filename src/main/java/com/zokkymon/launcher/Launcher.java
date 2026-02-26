@@ -21,6 +21,8 @@ import org.json.JSONObject;
 
 public class Launcher {
 
+    private static final String CLASSPATH_CACHE_FORMAT = "v5";
+
     private static final Set<String> TRUSTED_DOWNLOAD_HOSTS = new HashSet<>(Arrays.asList(
         "github.com",
         "objects.githubusercontent.com",
@@ -31,6 +33,7 @@ public class Launcher {
         "maven.fabric.net",
         "launchermeta.mojang.com",
         "piston-meta.mojang.com",
+        "piston-data.mojang.com",
         "resources.download.minecraft.net"
     ));
 
@@ -193,11 +196,6 @@ public class Launcher {
             gui.appendLog("[Offline] Joueur: " + userName + " | UUID: " + userUUID);
         }
 
-        // Construire le classpath complet avec tous les JARs de libraries/
-        String classpath = buildClasspath(gameDirFile, fabricJar, gui);
-        String[] classpathParts = classpath.split(File.pathSeparator);
-        gui.appendLog("[*] Classpath construit: " + classpathParts.length + " JARs");
-
         // Localiser le JAR client Minecraft — indispensable pour que Fabric applique
         // correctement les remappings Intermediary (sans ça, les Mixins crashent)
         File minecraftClientJar = new File(librariesDir,
@@ -214,6 +212,21 @@ public class Launcher {
             gui.appendLog("[*] Game JAR: " + minecraftClientJar.getName());
         } else {
             gui.appendLog("[WARN] client JAR non trouvé — les Mixins risquent de crasher");
+        }
+
+        // Construire le classpath complet avec tous les JARs de libraries/
+        // + le game jar client explicite, requis par certains game providers Fabric.
+        String classpath = buildClasspath(gameDirFile, fabricJar, minecraftClientJar, gui);
+        String[] classpathParts = classpath.split(File.pathSeparator);
+        gui.appendLog("[*] Classpath construit: " + classpathParts.length + " JARs");
+
+        // Nettoyer les artefacts client Mojang invalides (ex: *-extra.jar sans classes)
+        // qui peuvent faire échouer le remap Fabric au démarrage.
+        if (cleanupInvalidMinecraftClientArtifacts(librariesDir, gui)) {
+            File classpathCache = new File(gameDirFile, ".classpath.cache");
+            if (classpathCache.exists() && !classpathCache.delete()) {
+                gui.appendLog("[WARN] Impossible de supprimer le cache classpath: " + classpathCache.getAbsolutePath());
+            }
         }
 
         // Résoudre l'id de l'assetIndex (ex: "17" pour 1.21.1, pas "1.21.1")
@@ -1125,11 +1138,6 @@ public class Launcher {
             {"org/ow2/asm/asm-tree/9.5", "asm-tree-9.5.jar"},
             {"org/ow2/asm/asm-analysis/9.5", "asm-analysis-9.5.jar"},
             {"org/ow2/asm/asm-util/9.5", "asm-util-9.5.jar"},
-            // JSON (obligatoire)
-            {"com/google/code/gson/gson/2.8.9", "gson-2.8.9.jar"},
-            // SLF4J (obligatoire)
-            {"org/slf4j/slf4j-api/1.7.36", "slf4j-api-1.7.36.jar"},
-            {"org/slf4j/slf4j-simple/1.7.36", "slf4j-simple-1.7.36.jar"},
         };
         
         // Essayer plusieurs sources Maven en fallback
@@ -1386,14 +1394,22 @@ public class Launcher {
      * @param gui       la fenêtre du launcher pour les logs
      * @return le classpath séparé par {@code File.pathSeparator}
      */
-    private static String buildClasspath(File gameDir, String fabricJar, LauncherGUI gui) {
+    private static String buildClasspath(File gameDir, String fabricJar, File minecraftClientJar, LauncherGUI gui) {
         File librariesDir = new File(gameDir, "libraries");
         File cacheFile    = new File(gameDir, ".classpath.cache");
         File libsMarker   = new File(librariesDir, ".launcher-libs.marker");
 
+        // Purge préventive : slf4j-simple provoque une boucle de logs avec l'écosystème Minecraft/Fabric.
+        // Si des jars sont supprimés, le marker est touché pour invalider le cache.
+        cleanupConflictingSlf4jSimpleJars(librariesDir, gui);
+
         // Tentative de lecture du cache (invalidé si Fabric jar ou libraries changent)
         long fabricJarMtime = (fabricJar != null) ? new File(fabricJar).lastModified() : 0L;
-        String cacheKey = fabricJar + "|" + fabricJarMtime + "|" + librariesDir.lastModified() + "|" + libsMarker.lastModified();
+        long minecraftClientJarMtime = (minecraftClientJar != null && minecraftClientJar.exists())
+            ? minecraftClientJar.lastModified() : 0L;
+        String cacheKey = CLASSPATH_CACHE_FORMAT + "|" + fabricJar + "|" + fabricJarMtime + "|"
+            + minecraftClientJar + "|" + minecraftClientJarMtime + "|"
+            + librariesDir.lastModified() + "|" + libsMarker.lastModified();
         try {
             if (cacheFile.exists()) {
                 String[] lines = new String(Files.readAllBytes(cacheFile.toPath()),
@@ -1412,6 +1428,23 @@ public class Launcher {
             classpathEntries.add(fabricJar);
             gui.appendLog("[*] Fabric Loader ajouté : " + new File(fabricJar).getName());
         }
+
+        if (minecraftClientJar != null && minecraftClientJar.exists()) {
+            classpathEntries.add(minecraftClientJar.getAbsolutePath());
+            gui.appendLog("[*] Game JAR ajouté au classpath : " + minecraftClientJar.getName());
+        }
+
+        // Auto-réparation des libs JSON/logging souvent en conflit sur les gros modpacks.
+        // Si une version trop ancienne est détectée (ex: gson 2.8.9), on télécharge
+        // une version minimale compatible puis on la priorise dans le classpath.
+        ensureMinimumJarVersion(
+            librariesDir,
+            "gson",
+            "2.10.1",
+            "com/google/code/gson/gson",
+            "https://repo1.maven.org/maven2/com/google/code/gson/gson/2.10.1/gson-2.10.1.jar",
+            gui
+        );
 
         // Sponge-Mixin : version la plus récente uniquement
         File spongeMixinBaseDir = new File(librariesDir, "net/fabricmc");
@@ -1440,6 +1473,13 @@ public class Launcher {
         if (latestGuava != null) {
             classpathEntries.add(latestGuava);
             gui.appendLog("[*] Guava ajouté (priorité) : " + new File(latestGuava).getName());
+        }
+
+        // Gson : version la plus récente uniquement (évite les NoSuchMethodError asMap/asList)
+        String latestGson = findLatestJarByPrefix(librariesDir, "gson", gui);
+        if (latestGson != null) {
+            classpathEntries.add(latestGson);
+            gui.appendLog("[*] Gson ajouté (priorité) : " + new File(latestGson).getName());
         }
 
         // ASM : une version par composant
@@ -1574,7 +1614,6 @@ public class Launcher {
     private static void findAllJars(File dir, List<String> jars, LauncherGUI gui) {
         try {
             Files.walk(dir.toPath())
-                .parallel()
                 .filter(p -> !Files.isDirectory(p))
                 .filter(p -> p.getFileName().toString().endsWith(".jar"))
                 .filter(p -> {
@@ -1584,14 +1623,43 @@ public class Launcher {
                         && !(name.startsWith("asm") && name.endsWith(".jar"))
                         && !name.startsWith("sponge-mixin")
                         && !name.startsWith("guava")
+                        && !name.startsWith("gson")
+                        && !name.startsWith("slf4j-simple")
+                        && !name.endsWith("-extra.jar")
                         && !name.contains("neoforge")
                         && !absPath.contains("/neoforged/")
-                        && !absPath.contains("/fancymodloader/");
+                        && !absPath.contains("/fancymodloader/")
+                        && !absPath.contains("/net/minecraft/client/");
                 })
+                .sorted(java.util.Comparator.comparing(java.nio.file.Path::toString, String.CASE_INSENSITIVE_ORDER))
                 .forEach(p -> jars.add(p.toAbsolutePath().toString()));
         } catch (java.io.IOException e) {
             gui.appendLog("[WARN] Erreur lecture du dossier libraries: " + e.getMessage());
         }
+    }
+
+    private static boolean cleanupInvalidMinecraftClientArtifacts(File librariesDir, LauncherGUI gui) {
+        File clientRoot = new File(librariesDir, "net/minecraft/client");
+        if (!clientRoot.exists()) return false;
+
+        boolean[] changed = new boolean[]{false};
+        try {
+            Files.walk(clientRoot.toPath())
+                .filter(p -> !Files.isDirectory(p))
+                .filter(p -> p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith("-extra.jar"))
+                .forEach(p -> {
+                    try {
+                        Files.deleteIfExists(p);
+                        changed[0] = true;
+                        gui.appendLog("[*] Artefact client invalide supprimé: " + p.getFileName());
+                    } catch (Exception e) {
+                        gui.appendLog("[WARN] Impossible de supprimer " + p.getFileName() + ": " + e.getMessage());
+                    }
+                });
+        } catch (Exception e) {
+            gui.appendLog("[WARN] Nettoyage des artefacts client ignoré: " + e.getMessage());
+        }
+        return changed[0];
     }
 
     /**
@@ -1922,15 +1990,90 @@ public class Launcher {
         String latestPath = null;
         String latestVersion = "0.0.0";
         for (File f : candidates) {
-            // Extrait version depuis "prefix-VERSION[-classifier].jar"
-            String withoutPrefix = f.getName().substring(prefix.length() + 1); // retirer "prefix-"
-            String versionPart = withoutPrefix.replace(".jar", "").split("-")[0]; // "32.1.2" ou "20.0"
+            String versionPart = extractVersionFromPrefixedJarName(f.getName(), prefix);
             if (compareVersions(versionPart, latestVersion) > 0) {
                 latestVersion = versionPart;
                 latestPath = f.getAbsolutePath();
             }
         }
         return latestPath;
+    }
+
+    private static String extractVersionFromPrefixedJarName(String jarName, String prefix) {
+        try {
+            if (jarName == null || prefix == null) return "0.0.0";
+            String expectedPrefix = prefix + "-";
+            if (!jarName.startsWith(expectedPrefix) || !jarName.endsWith(".jar")) return "0.0.0";
+            String withoutPrefix = jarName.substring(expectedPrefix.length());
+            return withoutPrefix.replace(".jar", "").split("-")[0];
+        } catch (Exception ignored) {
+            return "0.0.0";
+        }
+    }
+
+    private static void ensureMinimumJarVersion(
+            File librariesDir,
+            String prefix,
+            String minVersion,
+            String mavenPath,
+            String downloadUrl,
+            LauncherGUI gui) {
+        try {
+            String latestPath = findLatestJarByPrefix(librariesDir, prefix, gui);
+            String latestVersion = "0.0.0";
+            if (latestPath != null) {
+                latestVersion = extractVersionFromPrefixedJarName(new File(latestPath).getName(), prefix);
+            }
+
+            if (compareVersions(latestVersion, minVersion) >= 0) {
+                return;
+            }
+
+            String jarName = prefix + "-" + minVersion + ".jar";
+            File targetDir = new File(librariesDir, mavenPath + "/" + minVersion);
+            File targetJar = new File(targetDir, jarName);
+
+            if (!targetJar.exists()) {
+                targetDir.mkdirs();
+                gui.appendLog("[*] Mise à niveau dépendance: " + prefix + " " + latestVersion + " -> " + minVersion);
+                downloadDependency(downloadUrl, targetJar, 15000, 30000);
+                touchLibrariesMarker(librariesDir);
+                gui.appendLog("[OK] Dépendance installée: " + jarName);
+            }
+        } catch (Exception e) {
+            gui.appendLog("[WARN] Impossible de mettre à niveau " + prefix + ": " + e.getMessage());
+        }
+    }
+
+    private static void cleanupConflictingSlf4jSimpleJars(File librariesDir, LauncherGUI gui) {
+        if (librariesDir == null || !librariesDir.exists()) return;
+        boolean removed = false;
+        try {
+            try (java.util.stream.Stream<Path> stream = Files.walk(librariesDir.toPath())) {
+                List<Path> toDelete = stream
+                    .filter(p -> !Files.isDirectory(p))
+                    .filter(p -> {
+                        String n = p.getFileName().toString().toLowerCase(Locale.ROOT);
+                        return n.startsWith("slf4j-simple") && n.endsWith(".jar");
+                    })
+                    .toList();
+                for (Path p : toDelete) {
+                    try {
+                        Files.deleteIfExists(p);
+                        removed = true;
+                        gui.appendLog("[*] Jar conflictuel supprimé: " + p.getFileName());
+                    } catch (Exception e) {
+                        gui.appendLog("[WARN] Suppression impossible " + p.getFileName() + ": " + e.getMessage());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            gui.appendLog("[WARN] Purge slf4j-simple ignorée: " + e.getMessage());
+        }
+
+        if (removed) {
+            touchLibrariesMarker(librariesDir);
+        }
     }
 
     /**

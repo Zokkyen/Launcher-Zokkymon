@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch4jConfig>
+  <dontWrapJar>false</dontWrapJar>
+  <headerType>gui</headerType>
+  <jar>C:\Users\steph\Downloads\ZokkymonLauncher\target\ZokkymonLauncher.jar</jar>
+  <outfile>C:\Users\steph\Downloads\ZokkymonLauncher\ZokkymonLauncher.exe</outfile>
+  <errTitle>Java requis - ZokkymonLauncher</errTitle>
+  <cmdLine></cmdLine>
+  <chdir>.</chdir>
+  <priority>normal</priority>
+  <downloadUrl>https://adoptium.net/temurin/releases/?version=21</downloadUrl>
+  <supportUrl>https://adoptium.net/temurin/releases/?version=21</supportUrl>
+  <icon>C:\Users\steph\Downloads\ZokkymonLauncher\zokkymon.ico</icon>
+  <jre>
+    <path>%USERPROFILE%\.zokkymon\Jre_21</path>
+    <requiresJdk>false</requiresJdk>
+    <requires64Bit>true</requires64Bit>
+    <minVersion>21.0.0</minVersion>
+    <maxVersion></maxVersion>
+  </jre>
+</launch4jConfig>

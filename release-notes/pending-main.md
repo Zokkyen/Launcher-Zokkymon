@@ -1,9 +1,17 @@
-## 🚀 Zokkymon Launcher 0.3.1
+## 🚀 Notes de version stable (à compléter avant promotion)
 
-- Fiabilisation de la mise à jour automatique du launcher (ciblage EXE + persistance de version locale).
-- Correctifs CI/CD de release (build EXE Launch4j sur GitHub Actions, publication stable/beta plus robuste).
-- Mise à jour automatique de `info.json` directement dans les workflows de release (version, URL, SHA-256, changelog).
-- Documentation des processus de release clarifiée (`main` orienté utilisateur, `beta` orienté technique).
+- Nouveautés :
+  - Interface paramètres harmonisée avec libellés FR pour les profils de performances et le canal d'update
+  - Feedback utilisateur clarifié pour les actions de sauvegarde/restauration de configuration joueur
+
+- Améliorations :
+  - Connexion Microsoft fiabilisée (erreurs explicites et vérifications de configuration)
+  - Canal par défaut consolidé sur `stable` pour les nouvelles configurations
+  - Build local EXE Windows renforcé (meilleurs diagnostics, exécution Launch4j plus robuste)
+
+- Correctifs :
+  - Correctifs de lancement Minecraft/Fabric (classpath, artefacts invalides, cache classpath)
+  - Réduction des conflits de dépendances (JSON/logging) pouvant provoquer des crashes au démarrage
 
 ## ✅ Recommandé
 
