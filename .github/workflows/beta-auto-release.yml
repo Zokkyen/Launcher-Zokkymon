@@ -31,9 +31,16 @@ jobs:
       - name: Install Launch4j
         run: choco install launch4j -y --no-progress
 
+      - name: Setup Java 8 (required by Launch4j)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+
       - name: Build EXE with Launch4j
         shell: pwsh
         run: |
+          java -version
           $ws = "${{ github.workspace }}"
           $jarPath = Join-Path $ws "target\ZokkymonLauncher.jar"
           $exePath = Join-Path $ws "ZokkymonLauncher.exe"
