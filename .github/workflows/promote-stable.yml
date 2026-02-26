@@ -33,7 +33,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Optional merge beta into main (keep main README)
+      - name: Optional merge beta into main (keep main README/info)
         if: ${{ inputs.merge_beta }}
         shell: pwsh
         run: |
@@ -43,7 +43,8 @@ jobs:
 
           git merge --no-ff --no-commit origin/beta
           git checkout --ours -- README.md
-          git add README.md
+          git checkout --ours -- info.json
+          git add README.md info.json
 
           $unmerged = git diff --name-only --diff-filter=U
           if ($unmerged) {
@@ -54,7 +55,7 @@ jobs:
 
           $pending = git status --porcelain
           if ($pending) {
-            git commit -m "release: promote beta to main (keep main README)"
+            git commit -m "release: promote beta to main (keep main README/info)"
             git push origin main
           } else {
             Write-Host "Aucun changement à merger vers main."
