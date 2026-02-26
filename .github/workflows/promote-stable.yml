@@ -33,7 +33,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Optional merge beta into main (keep main README)
+      - name: Optional merge beta into main (keep main README/info)
         if: ${{ inputs.merge_beta }}
         shell: pwsh
         run: |
@@ -43,7 +43,8 @@ jobs:
 
           git merge --no-ff --no-commit origin/beta
           git checkout --ours -- README.md
-          git add README.md
+          git checkout --ours -- info.json
+          git add README.md info.json
 
           $unmerged = git diff --name-only --diff-filter=U
           if ($unmerged) {
@@ -54,10 +55,26 @@ jobs:
 
           $pending = git status --porcelain
           if ($pending) {
-            git commit -m "release: promote beta to main (keep main README)"
+            git commit -m "release: promote beta to main (keep main README/info)"
             git push origin main
           } else {
             Write-Host "Aucun changement à merger vers main."
+          }
+
+      - name: Stamp embedded launcher version (main)
+        shell: pwsh
+        run: |
+          $version = "${{ inputs.stable_version }}"
+          $infoUrl = "https://raw.githubusercontent.com/${{ github.repository }}/main/info.json"
+          $targets = @("config/launcher_config.json", "src/main/resources/launcher_config.json")
+
+          foreach ($path in $targets) {
+            if (!(Test-Path $path)) { continue }
+            $cfg = Get-Content $path -Raw | ConvertFrom-Json
+            $cfg.launcherVersion = $version
+            $cfg.launcherInfoUrl = $infoUrl
+            $json = $cfg | ConvertTo-Json -Depth 20
+            [System.IO.File]::WriteAllText((Resolve-Path $path), $json, [System.Text.UTF8Encoding]::new($false))
           }
 
       - name: Setup Java 21
