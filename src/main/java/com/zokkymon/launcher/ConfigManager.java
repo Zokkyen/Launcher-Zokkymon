@@ -171,8 +171,6 @@ public class ConfigManager {
     }
 
     private String inferDefaultChannel() {
-        String url = jarConfig.optString("launcherInfoUrl", "").toLowerCase(Locale.ROOT);
-        if (url.contains("/beta/")) return "beta";
         return "stable";
     }
 
