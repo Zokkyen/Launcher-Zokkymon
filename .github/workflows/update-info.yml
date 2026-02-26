@@ -41,11 +41,16 @@ jobs:
         run: |
           VERSION="${{ github.event.release.tag_name }}"
           VERSION="${VERSION#v}"   # enlève le 'v' du tag (v0.1.0 → 0.1.0)
+          CHANGELOG="${{ github.event.release.body }}"
           jq \
             --arg v "$VERSION" \
             --arg u "${{ steps.asset.outputs.url }}" \
             --arg s "${{ steps.sha.outputs.sha256 }}" \
-            '.version = $v | .url = $u | .sha256 = $s' \
+            --arg c "$CHANGELOG" \
+            '.version = $v
+             | .url = $u
+             | .sha256 = $s
+             | .changelog = (if ($c | gsub("\\r"; "") | length) > 0 then ($c | gsub("\\r"; "")) else .changelog end)' \
             info.json > info.json.tmp && mv info.json.tmp info.json
           echo "info.json mis à jour :"
           cat info.json
@@ -55,5 +60,9 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add info.json
+          if git diff --cached --quiet; then
+            echo "Aucun changement sur info.json, rien à commit."
+            exit 0
+          fi
           git commit -m "chore: update info.json → ${{ github.event.release.tag_name }}"
           git push

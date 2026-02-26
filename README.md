@@ -181,6 +181,36 @@ Au démarrage, le launcher compare `launcherVersion` (config) avec `info.json` d
 
 ---
 
+## Automatisation des releases (sans éditer de YAML)
+
+### 1) Beta automatique à chaque push sur `beta`
+
+- Workflow : `.github/workflows/beta-auto-release.yml`
+- Déclenchement : automatique sur push `beta` (hors commits du bot GitHub Actions)
+- Effet : build JAR + build EXE + création d'une pre-release GitHub + update automatique de `info.json` via `update-info.yml`
+
+Avant de push sur `beta`, complète si besoin :
+
+- `release-notes/pending-beta.md`
+
+Le contenu de cette note est repris dans la release, puis dans `info.json.changelog`.
+
+### 2) Promotion stable manuelle
+
+- Workflow : `.github/workflows/promote-stable.yml`
+- Déclenchement : GitHub → **Actions** → **Promote Stable Release** → **Run workflow**
+- Inputs :
+  - `stable_version` (ex: `0.4.0`)
+  - `merge_beta` (`true` pour fusionner `beta` vers `main` en gardant le `README.md` de `main`)
+
+Avant de lancer la promotion stable, complète si besoin :
+
+- `release-notes/pending-main.md`
+
+Comme pour la beta, la note devient le changelog final dans la release et `info.json`.
+
+---
+
 ## Branches
 
 | Branche | Rôle |
