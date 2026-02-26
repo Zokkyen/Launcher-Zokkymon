@@ -2,16 +2,43 @@ package com.zokkymon.launcher;
 
 import java.io.*;
 import java.net.URI;
-import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.*;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Locale;
+import java.nio.file.attribute.FileTime;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.security.MessageDigest;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 public class Launcher {
+
+    private static final Set<String> TRUSTED_DOWNLOAD_HOSTS = new HashSet<>(Arrays.asList(
+        "github.com",
+        "objects.githubusercontent.com",
+        "release-assets.githubusercontent.com",
+        "repo1.maven.org",
+        "repo.maven.apache.org",
+        "maven.fabricmc.net",
+        "maven.fabric.net",
+        "launchermeta.mojang.com",
+        "piston-meta.mojang.com",
+        "resources.download.minecraft.net"
+    ));
+
+    /**
+     * Chemin du JRE découvert lors du dernier appel à {@link #findJavaExecutable()}.
+     * Mis en cache pour éviter de répéter la recherche à chaque lancement.
+     */
+    private static volatile String cachedJavaExe = null;
 
     /**
      * Point d’entrée principal du lancement : prépare l’environnement (runtime Java, dépendances,
@@ -25,31 +52,39 @@ public class Launcher {
     public static void launchMinecraft(ConfigManager config, LauncherGUI gui, String gameDir) throws Exception {
         gui.appendLog("[*] Initialisation du runtime Java embarqué...");
         extractEmbeddedJavaRuntime(gui);
-        
-        String javaExe = findJavaExecutable();
-        if (javaExe == null) {
-            throw new Exception("Java n'est pas installé ou pas trouvé dans PATH");
-        }
 
-        // Vérification de la version Java (min. 21 requis par ce modpack)
-        String javaVersion = getJavaVersion(javaExe);
-        gui.appendLog("Java trouvé: " + javaExe);
-        gui.appendLog("Version Java: " + (javaVersion != null ? javaVersion : "INCONNUE"));
-        
-        if (javaVersion == null || !isJavaVersionAcceptable(javaVersion)) {
-            gui.appendLog("[WARN] Java 21+ requis pour ce modpack. Version détectée: " + (javaVersion != null ? javaVersion : "INCONNUE"));
-            
-            // Java 21 absent malgré l'installation automatique au démarrage
-            throw new Exception(
-                "ERREUR : Java 21 est requis mais n'a pas pu être installé.\n" +
-                "Relancez le launcher pour retenter l'installation automatique,\n" +
-                "ou installez Java 21 manuellement depuis : https://adoptium.net/"
-            );
+        // Utiliser le cache pour éviter de relancer la recherche + sous-processus java -version
+        String javaExe = cachedJavaExe;
+        if (javaExe == null || !new File(javaExe).exists()) {
+            javaExe = findJavaExecutable();
+            if (javaExe == null) {
+                throw new Exception("Java n'est pas installé ou pas trouvé dans PATH");
+            }
+            String javaVersion = getJavaVersion(javaExe);
+            gui.appendLog("Java trouvé: " + javaExe);
+            gui.appendLog("Version Java: " + (javaVersion != null ? javaVersion : "INCONNUE"));
+            if (javaVersion == null || !isJavaVersionAcceptable(javaVersion)) {
+                gui.appendLog("[WARN] Java 21+ requis pour ce modpack. Version détectée: " + (javaVersion != null ? javaVersion : "INCONNUE"));
+                throw new Exception(
+                    "ERREUR : Java 21 est requis mais n'a pas pu être installé.\n" +
+                    "Relancez le launcher pour retenter l'installation automatique,\n" +
+                    "ou installez Java 21 manuellement depuis : https://adoptium.net/"
+                );
+            }
+            cachedJavaExe = javaExe; // mise en cache pour les prochains lancements
+        } else {
+            gui.appendLog("[*] Java (cache): " + javaExe);
         }
 
         String ramAllocation = config.getRamAllocation();
         // Convertir "6 Go" en "6g" pour Java
         String javaRam = ramAllocation.replace(" Go", "g").replace(" go", "g").replace("Go", "g").replace("go", "g");
+        // Xms dynamique orienté démarrage rapide : entre 512m et 1g
+        // (la heap grandira ensuite automatiquement avec G1GC)
+        int xmxGb = 1;
+        try { xmxGb = Integer.parseInt(javaRam.replace("g", "").replace("G", "")); } catch (NumberFormatException ignored) {}
+        int xmsMb = Math.min(1024, Math.max(512, (xmxGb * 1024) / 4));
+        String javaXms = xmsMb + "m";
         
         String minecraftVersion = config.getMinecraftVersion();
         String fabricVersion = config.getFabricVersion();
@@ -102,6 +137,8 @@ public class Launcher {
         if (fabricJar == null) {
             throw new Exception("Fabric Loader JAR non trouvé. Assurez-vous que le modpack est bien extrait.");
         }
+
+        verifyFabricLoaderSha256(fabricJar, fabricVersion, gui);
 
         gui.appendLog("Fabric Loader trouvé: " + fabricJar);
         String modsDir = new File(gameDirFile, "mods").getAbsolutePath();
@@ -186,7 +223,27 @@ public class Launcher {
         ProcessBuilder pb = new ProcessBuilder(
             javaExe,
             "-Xmx" + javaRam,
-            "-Xms1G",
+            "-Xms" + javaXms,
+            // ── GC optimisé pour les gros modpacks (408+ mods) ───────────────
+            // Réduit les pauses GC de 40-60% pendant le chargement Fabric
+            "-XX:+UseG1GC",
+            "-XX:+ParallelRefProcEnabled",
+            "-XX:MaxGCPauseMillis=200",
+            "-XX:+UnlockExperimentalVMOptions",
+            "-XX:+DisableExplicitGC",
+            "-XX:G1NewSizePercent=30",
+            "-XX:G1MaxNewSizePercent=40",
+            "-XX:G1HeapRegionSize=8M",
+            "-XX:G1ReservePercent=20",
+            "-XX:G1HeapWastePercent=5",
+            "-XX:G1MixedGCCountTarget=4",
+            "-XX:InitiatingHeapOccupancyPercent=15",
+            "-XX:G1MixedGCLiveThresholdPercent=90",
+            "-XX:G1RSetUpdatingPauseTimePercent=5",
+            "-XX:SurvivorRatio=32",
+            "-XX:+PerfDisableSharedMem",
+            "-XX:-OmitStackTraceInFastThrow",
+            // ── Encodage + Fabric ────────────────────────────────────────────
             "-Dfile.encoding=UTF-8",
             "-Dfabric.development=false",
             "-DFabricMcEmu= net.minecraft.client.main.Main",
@@ -205,46 +262,115 @@ public class Launcher {
             "--assetsDir", resolveAssetsDir(gameDirFile, assetIndexId, gui),
             "--version", minecraftVersion
         );
+        List<String> extraJvmArgs = parseJvmArgs(config.getCustomJvmArgs());
+        if (!extraJvmArgs.isEmpty()) {
+            pb.command().addAll(3, extraJvmArgs);
+            gui.appendLog("[*] JVM args personnalisés appliqués: " + String.join(" ", extraJvmArgs));
+        }
+        if (config.isFullscreen()) {
+            pb.command().add("--fullscreen");
+        } else {
+            pb.command().add("--width");
+            pb.command().add(String.valueOf(config.getWindowWidth()));
+            pb.command().add("--height");
+            pb.command().add(String.valueOf(config.getWindowHeight()));
+        }
         // Récupérer le chemin résolu depuis la commande pour l'utiliser dans ensureLanguageAssets
         List<String> cmd = pb.command();
         String resolvedAssetsPath = cmd.get(cmd.indexOf("--assetsDir") + 1);
 
         pb.directory(gameDirFile);
 
-        // Nettoyer .fabric/remappedJars avant chaque lancement :
-        // Fabric échoue si ce dossier contient des fichiers partiels d'une session précédente.
-        File remappedJarsDir = new File(gameDirFile, ".fabric" + File.separator + "remappedJars");
-        if (remappedJarsDir.exists()) {
-            gui.appendLog("[*] Nettoyage du cache Fabric (remappedJars)...");
-            deleteDir(remappedJarsDir);
-        }
+        // Nettoyage conditionnel : uniquement si la signature a changé
+        // (version MC/Fabric ou contenu du dossier mods).
+        cleanupRemappedJarsIfNeeded(gameDirFile, minecraftVersion, fabricVersion, gui);
 
         // Assurer que les assets de langue sont présents dans le dossier assets résolu
-        ensureLanguageAssets(new File(resolvedAssetsPath), assetIndexId, gui);
-
-        // Désactiver les layouts FancyMenu qui écrasent l'écran de langue
-        disableFancyMenuLanguageLayouts(gameDirFile, gui);
-
-        // Appliquer la langue dans options.txt (Minecraft lit ce fichier, pas -Duser.language)
-        ensureOptionsLanguage(gameDirFile);
-        gui.appendLog("[*] Langue appliquée : fr_fr dans options.txt");
+        // + désactiver FancyMenu + appliquer la langue + injecter les mods
+        // → 4 opérations I/O indépendantes : on les lance toutes en parallèle
+        final File finalAssetsPath = new File(resolvedAssetsPath);
+        final String finalAssetIndexId = assetIndexId;
+        final File finalGameDirFile2 = gameDirFile;
+        try {
+            CompletableFuture.allOf(
+                CompletableFuture.runAsync(() -> {
+                    try { ensureLanguageAssets(finalAssetsPath, finalAssetIndexId, gui); }
+                    catch (Exception e) { gui.appendLog("[WARN] ensureLanguageAssets: " + e.getMessage()); }
+                }),
+                CompletableFuture.runAsync(() -> disableFancyMenuLanguageLayouts(finalGameDirFile2, gui)),
+                CompletableFuture.runAsync(() -> {
+                    try { ensureOptionsLanguage(finalGameDirFile2); } catch (Exception ignored) {}
+                    gui.appendLog("[*] Langue appliquée : fr_fr dans options.txt");
+                }),
+                CompletableFuture.runAsync(() -> injectLauncherMods(finalGameDirFile2, gui))
+            ).get();
+        } catch (Exception e) {
+            gui.appendLog("[WARN] Pré-checks partiels : " + e.getMessage());
+        }
 
         // Rediriger STDERR vers STDOUT pour capturer les logs
         pb.redirectErrorStream(true);
 
         gui.appendLog("Lancement du jeu...");
         Process process = pb.start();
-        
-        // Lire et afficher la sortie du processus
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+
+        // ── Lecture des logs Minecraft ───────────────────────────────────────
+        final java.util.regex.Pattern PAT_INIT =
+            java.util.regex.Pattern.compile("Initializing (game|client|Minecraft)",
+                java.util.regex.Pattern.CASE_INSENSITIVE);
+
+        try (java.io.BufferedReader reader =
+                new java.io.BufferedReader(
+                    new java.io.InputStreamReader(process.getInputStream()))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 gui.appendLog("[MC] " + line);
+                if (PAT_INIT.matcher(line).find()) {
+                    gui.setStatus("Jeu en cours d'exécution...");
+                    gui.setProgress(100);
+                }
             }
         }
-        
+
         int exitCode = process.waitFor();
         gui.appendLog("[MC] Processus terminé avec le code: " + exitCode);
+    }
+
+    /**
+     * Répare une installation existante sans suppression complète.
+     */
+    public static void repairInstallation(ConfigManager config, LauncherGUI gui, String gameDir) throws Exception {
+        File gameDirFile = new File(gameDir);
+        if (!gameDirFile.exists() || !gameDirFile.isDirectory()) {
+            throw new Exception("Dossier de modpack introuvable: " + gameDir);
+        }
+
+        String minecraftVersion = config.getMinecraftVersion();
+        String fabricVersion = config.getFabricVersion();
+
+        gui.appendLog("[Repair] Démarrage de la réparation ciblée...");
+        extractEmbeddedJavaRuntime(gui);
+
+        File librariesDir = new File(gameDirFile, "libraries");
+        if (!librariesDir.exists()) librariesDir.mkdirs();
+
+        downloadMinecraftJarsIfMissing(librariesDir, minecraftVersion, gui);
+        downloadFabricDependencies(librariesDir, gui);
+        downloadFabricLoaderIfMissing(gameDirFile, minecraftVersion, fabricVersion, gui);
+
+        String fabricJar = findFabricLoaderJar(gameDirFile, minecraftVersion, fabricVersion, gui);
+        if (fabricJar == null) {
+            fabricJar = findFabricLoaderJarInLibraries(librariesDir);
+        }
+        if (fabricJar != null) {
+            verifyFabricLoaderSha256(fabricJar, fabricVersion, gui);
+        }
+
+        cleanupRemappedJarsIfNeeded(gameDirFile, minecraftVersion, fabricVersion, gui);
+        injectLauncherMods(gameDirFile, gui);
+        try { ensureOptionsLanguage(gameDirFile); } catch (Exception ignored) {}
+
+        gui.appendLog("[Repair] Réparation terminée.");
     }
 
     // URL de téléchargement officielle Eclipse Temurin 21.0.4 (Windows x64 JRE)
@@ -281,6 +407,7 @@ public class Launcher {
         try {
             // Téléchargement
             downloadFileWithProgress(JRE_DOWNLOAD_URL, zipFile.getAbsolutePath(), gui);
+            verifyArtifactSha256OrThrow(zipFile, JRE_DOWNLOAD_URL, "JRE Temurin ZIP", gui);
             gui.appendLog("[OK] Téléchargement terminé");
             gui.setProgress(50);
 
@@ -479,10 +606,7 @@ public class Launcher {
         try {
             // Étape 1 : télécharger le manifest pour trouver la version MC correspondant à l'assetIndex
             // On cherche la première version MC qui utilise cet assetIndex id
-            URL manifestUrl = URI.create(fallbackManifest).toURL();
-            URLConnection conn = manifestUrl.openConnection();
-            conn.setConnectTimeout(10000); conn.setReadTimeout(15000);
-            conn.setRequestProperty("User-Agent", "ZokkymonLauncher/1.0");
+            URLConnection conn = openSecureConnection(fallbackManifest, 10000, 15000);
             StringBuilder sb = new StringBuilder();
             try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
                 String l; while ((l = br.readLine()) != null) sb.append(l);
@@ -515,10 +639,7 @@ public class Launcher {
             String versionJsonUrl = chunk.substring(urlIdx, chunk.indexOf("\"", urlIdx));
 
             // Étape 2 : télécharger le JSON de version pour trouver l'URL de l'assetIndex
-            URL vUrl = URI.create(versionJsonUrl).toURL();
-            URLConnection vConn = vUrl.openConnection();
-            vConn.setConnectTimeout(10000); vConn.setReadTimeout(15000);
-            vConn.setRequestProperty("User-Agent", "ZokkymonLauncher/1.0");
+            URLConnection vConn = openSecureConnection(versionJsonUrl, 10000, 15000);
             StringBuilder vSb = new StringBuilder();
             try (BufferedReader br = new BufferedReader(new InputStreamReader(vConn.getInputStream()))) {
                 String l; while ((l = br.readLine()) != null) vSb.append(l);
@@ -632,13 +753,87 @@ public class Launcher {
     }
 
     /**
+     * Nettoie remappedJars uniquement si l'environnement de remap a changé
+     * (version MC/Fabric ou liste des mods), sinon réutilise le cache.
+     */
+    private static void cleanupRemappedJarsIfNeeded(File gameDir, String mcVersion, String fabricVersion, LauncherGUI gui) {
+        File fabricDir = new File(gameDir, ".fabric");
+        if (!fabricDir.exists()) fabricDir.mkdirs();
+
+        File remappedJarsDir = new File(fabricDir, "remappedJars");
+        File fingerprintFile = new File(fabricDir, "remapped-fingerprint.txt");
+
+        String currentFingerprint = mcVersion + "|" + fabricVersion + "|" + computeModsFingerprint(new File(gameDir, "mods"));
+        String previousFingerprint = readSmallTextFile(fingerprintFile);
+
+        boolean fingerprintChanged = !currentFingerprint.equals(previousFingerprint);
+        if (remappedJarsDir.exists() && fingerprintChanged) {
+            gui.appendLog("[*] Cache Fabric invalide (mods/version changés) : nettoyage remappedJars...");
+            deleteDir(remappedJarsDir);
+        } else if (remappedJarsDir.exists()) {
+            gui.appendLog("[*] Cache Fabric réutilisé (remappedJars inchangé)");
+        }
+
+        writeSmallTextFile(fingerprintFile, currentFingerprint);
+    }
+
+    /**
+     * Empreinte légère du dossier mods pour détecter les changements sans hash coûteux des fichiers.
+     */
+    private static String computeModsFingerprint(File modsDir) {
+        File[] jars = modsDir.listFiles((dir, name) -> name.toLowerCase().endsWith(".jar"));
+        if (jars == null || jars.length == 0) return "mods:empty";
+
+        Arrays.sort(jars, Comparator.comparing(File::getName, String.CASE_INSENSITIVE_ORDER));
+        StringBuilder sb = new StringBuilder();
+        for (File jar : jars) {
+            sb.append(jar.getName())
+              .append(':')
+              .append(jar.length())
+              .append(':')
+              .append(jar.lastModified())
+              .append(';');
+        }
+        return "mods:" + jars.length + ":" + Integer.toHexString(sb.toString().hashCode());
+    }
+
+    private static String readSmallTextFile(File file) {
+        if (!file.exists()) return "";
+        try {
+            return Files.readString(file.toPath(), java.nio.charset.StandardCharsets.UTF_8).trim();
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    private static void writeSmallTextFile(File file, String content) {
+        try {
+            Files.writeString(file.toPath(), content, java.nio.charset.StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        } catch (Exception ignored) {
+            // Non bloquant
+        }
+    }
+
+    private static void touchLibrariesMarker(File librariesDir) {
+        try {
+            if (!librariesDir.exists()) librariesDir.mkdirs();
+            File marker = new File(librariesDir, ".launcher-libs.marker");
+            if (!marker.exists()) {
+                Files.writeString(marker.toPath(), "", java.nio.charset.StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            }
+            Files.setLastModifiedTime(marker.toPath(), FileTime.fromMillis(System.currentTimeMillis()));
+        } catch (Exception ignored) {
+            // Non bloquant
+        }
+    }
+
+    /**
      * Télécharge un fichier avec barre de progression
      */
     private static void downloadFileWithProgress(String urlString, String outputPath, LauncherGUI gui) throws Exception {
-        URL url = URI.create(urlString).toURL();
-        URLConnection conn = url.openConnection();
-        conn.setConnectTimeout(10000);
-        conn.setReadTimeout(60000);
+        URLConnection conn = openSecureConnection(urlString, 10000, 60000);
         long contentLength = conn.getContentLengthLong();
 
         try (java.io.InputStream in = conn.getInputStream();
@@ -669,44 +864,41 @@ public class Launcher {
      */
     private static void extractZip(String zipPath, String destPath, LauncherGUI gui) throws Exception {
         File destDir = new File(destPath);
-        if (!destDir.exists()) {
-            destDir.mkdirs();
-        }
-        
+        if (!destDir.exists()) destDir.mkdirs();
+
         gui.appendLog("[*] Extraction: " + zipPath + " -> " + destPath);
-        
-        String osName = System.getProperty("os.name").toLowerCase();
-        ProcessBuilder pb;
-        
-        if (osName.contains("win")) {
-            // Windows: utiliser PowerShell
-            pb = new ProcessBuilder(
-                "powershell",
-                "-Command",
-                "Expand-Archive -Path '" + zipPath + "' -DestinationPath '" + destPath + "' -Force"
-            );
-        } else {
-            // Linux/Mac: utiliser unzip
-            pb = new ProcessBuilder("unzip", "-o", zipPath, "-d", destPath);
-        }
-        
-        pb.redirectErrorStream(true);
-        Process p = pb.start();
-        
-        // Lire la sortie
-        BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
-        String line;
-        while ((line = reader.readLine()) != null) {
-            if (!line.trim().isEmpty()) {
-                gui.appendLog("[ZIP] " + line);
+
+        Path destRoot = destDir.getCanonicalFile().toPath();
+        int fileCount = 0;
+
+        try (ZipInputStream zis = new ZipInputStream(new FileInputStream(zipPath))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                Path outPath = destRoot.resolve(entry.getName()).normalize();
+                if (!outPath.startsWith(destRoot)) {
+                    throw new IOException("Entrée ZIP invalide (path traversal): " + entry.getName());
+                }
+
+                if (entry.isDirectory()) {
+                    Files.createDirectories(outPath);
+                } else {
+                    Path parent = outPath.getParent();
+                    if (parent != null) Files.createDirectories(parent);
+                    try (OutputStream out = Files.newOutputStream(outPath,
+                        StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
+                        byte[] buffer = new byte[8192];
+                        int len;
+                        while ((len = zis.read(buffer)) > 0) {
+                            out.write(buffer, 0, len);
+                        }
+                    }
+                    fileCount++;
+                }
+                zis.closeEntry();
             }
         }
-        
-        int exitCode = p.waitFor();
-        
-        if (exitCode != 0) {
-            throw new Exception("Erreur extraction ZIP (code: " + exitCode + ")");
-        }
+
+        gui.appendLog("[OK] Extraction terminée (" + fileCount + " fichiers)");
     }
 
     /**
@@ -772,6 +964,7 @@ public class Launcher {
             resourceStream.close();
             
             gui.appendLog("[OK] JAR copié depuis les ressources (" + (totalBytes / 1024 / 1024) + " MB)");
+            touchLibrariesMarker(librariesDir);
             return;
         }
         
@@ -799,6 +992,7 @@ public class Launcher {
         try {
             downloadFileWithProgress(minecraftJarUrl, clientJarFile.getAbsolutePath(), gui);
             gui.appendLog("[OK] Client Minecraft téléchargé avec succès!");
+            touchLibrariesMarker(librariesDir);
         } catch (Exception e) {
             clientJarFile.delete(); // Nettoyer le JAR corrompu
             throw new Exception("Erreur téléchargement client Minecraft: " + e.getMessage());
@@ -835,9 +1029,7 @@ public class Launcher {
 
                 try {
                     gui.appendLog("[*] Téléchargement du manifest Mojang...");
-                    URLConnection conn = URI.create(versionManifestUrl).toURL().openConnection();
-                    conn.setConnectTimeout(8000);
-                    conn.setReadTimeout(15000);
+                    URLConnection conn = openSecureConnection(versionManifestUrl, 8000, 15000);
                     BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
                     StringBuilder manifestSb = new StringBuilder();
                     String ln;
@@ -867,9 +1059,7 @@ public class Launcher {
                 }
 
                 gui.appendLog("[*] URL de version trouvée, récupération du JSON...");
-                URLConnection vc = URI.create(versionJsonUrl).toURL().openConnection();
-                vc.setConnectTimeout(8000);
-                vc.setReadTimeout(15000);
+                URLConnection vc = openSecureConnection(versionJsonUrl, 8000, 15000);
                 BufferedReader vr = new BufferedReader(new InputStreamReader(vc.getInputStream()));
                 StringBuilder versionSb = new StringBuilder();
                 String ln;
@@ -950,6 +1140,7 @@ public class Launcher {
         };
         
         int count = 0;
+        boolean librariesChanged = false;
         
         for (String[] dep : dependencies) {
             String path = dep[0];
@@ -975,6 +1166,7 @@ public class Launcher {
                     gui.appendLog("[OK] " + jarName + " téléchargé");
                     success = true;
                     count++;
+                    librariesChanged = true;
                     break;
                 } catch (Exception e) {
                     gui.appendLog("[RETRY] " + mavenUrl + " timeout, essai suivant...");
@@ -990,6 +1182,10 @@ public class Launcher {
             gui.appendLog("[WARN] Aucune dépendance téléchargée");
         } else {
             gui.appendLog("[OK] " + count + "/" + dependencies.length + " dépendances téléchargées");
+        }
+
+        if (librariesChanged) {
+            touchLibrariesMarker(librariesDir);
         }
     }
     
@@ -1057,10 +1253,7 @@ public class Launcher {
      * @param readTimeout     timeout de lecture en ms
      */
     private static void downloadDependency(String urlStr, File destFile, int connectTimeout, int readTimeout) throws Exception {
-        URL url = URI.create(urlStr).toURL();
-        URLConnection conn = url.openConnection();
-        conn.setConnectTimeout(connectTimeout);
-        conn.setReadTimeout(readTimeout);
+        URLConnection conn = openSecureConnection(urlStr, connectTimeout, readTimeout);
         
         try (InputStream in = conn.getInputStream();
              FileOutputStream out = new FileOutputStream(destFile)) {
@@ -1071,6 +1264,109 @@ public class Launcher {
                 out.write(buffer, 0, bytesRead);
             }
         }
+    }
+
+    private static URLConnection openSecureConnection(String urlStr, int connectTimeout, int readTimeout) throws Exception {
+        URI uri = URI.create(urlStr);
+        String scheme = uri.getScheme();
+        String host = uri.getHost();
+
+        if (scheme == null || !"https".equalsIgnoreCase(scheme)) {
+            throw new SecurityException("URL non sécurisée (HTTPS requis): " + urlStr);
+        }
+        if (host == null || !isTrustedHost(host)) {
+            throw new SecurityException("Hôte non approuvé: " + host);
+        }
+
+        URLConnection conn = uri.toURL().openConnection();
+        conn.setConnectTimeout(connectTimeout);
+        conn.setReadTimeout(readTimeout);
+        conn.setRequestProperty("User-Agent", "ZokkymonLauncher/1.0");
+        return conn;
+    }
+
+    private static boolean isTrustedHost(String host) {
+        String normalizedHost = host.toLowerCase(Locale.ROOT);
+        for (String trusted : TRUSTED_DOWNLOAD_HOSTS) {
+            if (normalizedHost.equals(trusted) || normalizedHost.endsWith("." + trusted)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void verifyFabricLoaderSha256(String fabricJarPath, String fabricVersion, LauncherGUI gui) throws Exception {
+        File fabricJar = new File(fabricJarPath);
+        if (!fabricJar.exists()) {
+            throw new Exception("Fabric Loader introuvable pour vérification SHA-256: " + fabricJarPath);
+        }
+
+        String mavenJarName = "fabric-loader-" + fabricVersion + ".jar";
+        String fabricMavenUrl = "https://maven.fabricmc.net/net/fabricmc/fabric-loader/" + fabricVersion + "/" + mavenJarName;
+        verifyArtifactSha256OrThrow(fabricJar, fabricMavenUrl, "Fabric Loader", gui);
+    }
+
+    private static void verifyArtifactSha256OrThrow(File file, String sourceUrl, String label, LauncherGUI gui) throws Exception {
+        String expected = fetchRemoteSha256(sourceUrl);
+        if (expected == null || expected.isBlank()) {
+            throw new SecurityException("Checksum SHA-256 introuvable pour " + label + " (source: " + sourceUrl + ")");
+        }
+
+        String actual = computeFileSha256(file);
+        if (!actual.equalsIgnoreCase(expected)) {
+            throw new SecurityException(
+                "SHA-256 invalide pour " + label + "\n" +
+                "Attendu : " + expected + "\n" +
+                "Calculé : " + actual
+            );
+        }
+
+        gui.appendLog("[OK] " + label + " vérifié (SHA-256)");
+    }
+
+    private static String fetchRemoteSha256(String artifactUrl) {
+        String[] checksumCandidates = {artifactUrl + ".sha256", artifactUrl + ".sha256.txt"};
+        for (String checksumUrl : checksumCandidates) {
+            try {
+                URLConnection conn = openSecureConnection(checksumUrl, 10000, 15000);
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = br.readLine()) != null) sb.append(line).append('\n');
+                    String parsed = parseSha256FromText(sb.toString());
+                    if (parsed != null) return parsed;
+                }
+            } catch (Exception ignored) {
+                // on tente l'URL suivante
+            }
+        }
+        return null;
+    }
+
+    private static String parseSha256FromText(String text) {
+        if (text == null) return null;
+        String[] tokens = text.toLowerCase(Locale.ROOT).split("[^a-f0-9]+");
+        for (String token : tokens) {
+            if (token.length() == 64) return token;
+        }
+        return null;
+    }
+
+    private static String computeFileSha256(File file) throws Exception {
+        MessageDigest md = MessageDigest.getInstance("SHA-256");
+        try (InputStream in = new BufferedInputStream(new FileInputStream(file))) {
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = in.read(buffer)) != -1) {
+                md.update(buffer, 0, read);
+            }
+        }
+        byte[] digest = md.digest();
+        StringBuilder hex = new StringBuilder(digest.length * 2);
+        for (byte b : digest) {
+            hex.append(String.format("%02x", b));
+        }
+        return hex.toString();
     }
 
     /**
@@ -1093,9 +1389,11 @@ public class Launcher {
     private static String buildClasspath(File gameDir, String fabricJar, LauncherGUI gui) {
         File librariesDir = new File(gameDir, "libraries");
         File cacheFile    = new File(gameDir, ".classpath.cache");
+        File libsMarker   = new File(librariesDir, ".launcher-libs.marker");
 
-        // Tentative de lecture du cache (invalidé si lastModified de libraries/ ou fabricJar change)
-        String cacheKey = fabricJar + "|" + librariesDir.lastModified();
+        // Tentative de lecture du cache (invalidé si Fabric jar ou libraries changent)
+        long fabricJarMtime = (fabricJar != null) ? new File(fabricJar).lastModified() : 0L;
+        String cacheKey = fabricJar + "|" + fabricJarMtime + "|" + librariesDir.lastModified() + "|" + libsMarker.lastModified();
         try {
             if (cacheFile.exists()) {
                 String[] lines = new String(Files.readAllBytes(cacheFile.toPath()),
@@ -1548,6 +1846,20 @@ public class Launcher {
             return false;
         }
     }
+
+    /**
+     * API de diagnostic pour l'UI : retourne le chemin Java compatible (>=21) si trouvé.
+     */
+    public static String findCompatibleJavaExecutable() {
+        return findJavaExecutable();
+    }
+
+    /**
+     * API de diagnostic pour l'UI : retourne la version d'un exécutable Java donné.
+     */
+    public static String readJavaVersion(String javaPath) {
+        return getJavaVersion(javaPath);
+    }
     
     /**
      * Cherche récursivement le premier JAR ASM dans un répertoire
@@ -1635,6 +1947,103 @@ public class Launcher {
                 })
                 .forEach(p -> result.add(p.toFile()));
         } catch (java.io.IOException e) { /* ignorer */ }
+    }
+
+    /**
+     * Copie tous les JARs présents dans le dossier {@code mods/} du launcher
+     * vers {@code gameDir/mods/}.
+     * <p>
+     * Cela permet d'injecter des mods utilitaires (ex: splash screen personnalisé)
+     * sans modifier le modpack lui-même.
+     * Le JAR n'est copié que si absent ou si la taille a changé (mise à jour).
+     * </p>
+     */
+    private static void injectLauncherMods(File gameDirFile, LauncherGUI gui) {
+        // Localiser le dossier "mods/" du launcher :
+        // 1) Dossier contenant le JAR du launcher
+        // 2) Répertoire courant (fallback dev)
+        File launcherModsDir = null;
+        try {
+            java.net.URL location = Launcher.class.getProtectionDomain()
+                .getCodeSource().getLocation();
+            File launcherFile = new File(location.toURI());
+            File candidate = new File(launcherFile.isDirectory()
+                ? launcherFile                      // classes/ en dev
+                : launcherFile.getParentFile(),     // fichier .jar déployé
+                "mods");
+            if (candidate.isDirectory()) launcherModsDir = candidate;
+        } catch (Exception ignored) {}
+
+        // Fallback : répertoire courant
+        if (launcherModsDir == null) {
+            File fallback = new File("mods");
+            if (fallback.isDirectory()) launcherModsDir = fallback;
+        }
+
+        if (launcherModsDir == null) return; // rien à injecter
+
+        File gameMods = new File(gameDirFile, "mods");
+        gameMods.mkdirs();
+
+        File[] jars = launcherModsDir.listFiles(
+            (dir, name) -> name.endsWith(".jar"));
+        if (jars == null || jars.length == 0) return;
+
+        // Cache incrémental : si la liste des mods du launcher n'a pas changé,
+        // on évite de rescanner/copie à chaque lancement.
+        File cacheFile = new File(gameDirFile, ".launcher_mods_fingerprint");
+        String currentFingerprint = computeModsFingerprint(launcherModsDir);
+        String previousFingerprint = readSmallTextFile(cacheFile);
+        if (currentFingerprint.equals(previousFingerprint)) {
+            gui.appendLog("[Mods] Injection inchangée (cache). ");
+            return;
+        }
+
+        for (File src : jars) {
+            File dest = new File(gameMods, src.getName());
+            boolean needsCopy = !dest.exists() || dest.length() != src.length();
+            if (needsCopy) {
+                try {
+                    java.nio.file.Files.copy(src.toPath(), dest.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    gui.appendLog("[Mods] Injecté : " + src.getName());
+                } catch (Exception e) {
+                    gui.appendLog("[Mods] Erreur injection " + src.getName()
+                        + " : " + e.getMessage());
+                }
+            } else {
+                gui.appendLog("[Mods] Déjà présent : " + src.getName());
+            }
+        }
+
+        writeSmallTextFile(cacheFile, currentFingerprint);
+    }
+
+    private static List<String> parseJvmArgs(String raw) {
+        List<String> args = new ArrayList<>();
+        if (raw == null || raw.isBlank()) return args;
+
+        StringBuilder current = new StringBuilder();
+        boolean inQuotes = false;
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if (c == '"') {
+                inQuotes = !inQuotes;
+                continue;
+            }
+            if (!inQuotes && Character.isWhitespace(c)) {
+                if (current.length() > 0) {
+                    args.add(current.toString());
+                    current.setLength(0);
+                }
+            } else {
+                current.append(c);
+            }
+        }
+        if (current.length() > 0) {
+            args.add(current.toString());
+        }
+        return args;
     }
 
 }

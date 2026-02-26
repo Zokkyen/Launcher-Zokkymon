@@ -1,10 +1,17 @@
 # ── Build Maven ───────────────────────────────────────────────────────────────
 target/
 *.class
-*.jar
 *.war
 *.ear
+# maven-shade génère ce fichier à côté de pom.xml — ne pas versionner
 dependency-reduced-pom.xml
+
+# ── Artefacts binaires générés ────────────────────────────────────────────────
+# Générés par Launch4j / Maven package — distribués via GitHub Releases
+ZokkymonLauncher.exe
+ZokkymonLauncher.jar
+# Log Launch4j
+launch4j.log
 
 # ── IDE ───────────────────────────────────────────────────────────────────────
 .idea/

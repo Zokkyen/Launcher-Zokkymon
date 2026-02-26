@@ -5,6 +5,8 @@ import java.io.File;
 import java.io.InputStream;
 import java.io.IOException;
 import java.nio.file.*;
+import java.net.URI;
+import java.util.Locale;
 import java.util.Set;
 
 public class ConfigManager {
@@ -107,6 +109,9 @@ public class ConfigManager {
         u.put("ram", "6 Go");
         u.put("language", "fr");
         u.put("darkMode", true);
+        u.put("launcherChannel", inferDefaultChannel());
+        u.put("launchProfile", "performance");
+        u.put("customJvmArgs", "");
         return u;
     }
 
@@ -137,9 +142,65 @@ public class ConfigManager {
 
     public String getLauncherInfoUrl() {
         String u = jarConfig.optString("launcherInfoUrl", "");
-        if (!u.isBlank()) return u;
+        if (!u.isBlank()) {
+            return mapLauncherInfoUrlForChannel(u, getLauncherChannel());
+        }
         String server = getServerUrl();
         return server + (server.endsWith("/") ? "" : "/") + "launcher/info.json";
+    }
+
+    public String getLauncherChannel() {
+        String c = userConfig.optString("launcherChannel", "").toLowerCase(Locale.ROOT).trim();
+        if ("beta".equals(c)) return "beta";
+        if ("stable".equals(c) || "main".equals(c)) return "stable";
+        return inferDefaultChannel();
+    }
+
+    public void setLauncherChannel(String channel) {
+        String normalized = "beta".equalsIgnoreCase(channel) ? "beta" : "stable";
+        userConfig.put("launcherChannel", normalized);
+        saveConfig();
+    }
+
+    private String inferDefaultChannel() {
+        String url = jarConfig.optString("launcherInfoUrl", "").toLowerCase(Locale.ROOT);
+        if (url.contains("/beta/")) return "beta";
+        return "stable";
+    }
+
+    private String mapLauncherInfoUrlForChannel(String originalUrl, String channel) {
+        String targetBranch = "beta".equals(channel) ? "beta" : "main";
+        try {
+            URI uri = URI.create(originalUrl);
+            String host = uri.getHost();
+            String path = uri.getPath();
+            if (host == null || path == null) return originalUrl;
+            if (!"raw.githubusercontent.com".equalsIgnoreCase(host)) return originalUrl;
+
+            String[] parts = path.split("/");
+            // path attendu : /owner/repo/branch/...
+            if (parts.length < 5) return originalUrl;
+            parts[3] = targetBranch;
+
+            StringBuilder rebuiltPath = new StringBuilder();
+            for (String p : parts) {
+                if (p == null || p.isEmpty()) continue;
+                rebuiltPath.append('/').append(p);
+            }
+
+            URI mapped = new URI(
+                uri.getScheme(),
+                uri.getUserInfo(),
+                uri.getHost(),
+                uri.getPort(),
+                rebuiltPath.toString(),
+                uri.getQuery(),
+                uri.getFragment()
+            );
+            return mapped.toString();
+        } catch (Exception ignored) {
+            return originalUrl;
+        }
     }
 
     /**
@@ -285,6 +346,53 @@ public class ConfigManager {
         userConfig.remove("msaAccessToken");
         userConfig.remove("msaRefreshToken");
         userConfig.remove("msaExpiresAt");
+        saveConfig();
+    }
+
+    // ── Résolution de la fenêtre Minecraft ───────────────────────────────────
+    public int getWindowWidth()  { return userConfig.optInt("windowWidth",  1280); }
+    public int getWindowHeight() { return userConfig.optInt("windowHeight",  720); }
+    public boolean isFullscreen() { return userConfig.optBoolean("fullscreen", false); }
+
+    public void setWindowSize(int width, int height) {
+        userConfig.put("windowWidth",  width);
+        userConfig.put("windowHeight", height);
+        saveConfig();
+    }
+
+    public void setFullscreen(boolean fullscreen) {
+        userConfig.put("fullscreen", fullscreen);
+        saveConfig();
+    }
+
+    // ── Profils de lancement / JVM args ─────────────────────────────────────
+    public String getLaunchProfile() {
+        String p = userConfig.optString("launchProfile", "performance").toLowerCase(Locale.ROOT).trim();
+        return switch (p) {
+            case "quality", "qualite" -> "quality";
+            case "low-end", "lowend" -> "low-end";
+            case "custom" -> "custom";
+            default -> "performance";
+        };
+    }
+
+    public void setLaunchProfile(String profile) {
+        String normalized = switch (profile == null ? "" : profile.toLowerCase(Locale.ROOT).trim()) {
+            case "quality", "qualite" -> "quality";
+            case "low-end", "lowend" -> "low-end";
+            case "custom" -> "custom";
+            default -> "performance";
+        };
+        userConfig.put("launchProfile", normalized);
+        saveConfig();
+    }
+
+    public String getCustomJvmArgs() {
+        return userConfig.optString("customJvmArgs", "").trim();
+    }
+
+    public void setCustomJvmArgs(String args) {
+        userConfig.put("customJvmArgs", args == null ? "" : args.trim());
         saveConfig();
     }
 }

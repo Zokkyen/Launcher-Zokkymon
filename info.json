@@ -1,5 +1,10 @@
 {
   "version": "0.2.2",
   "url": "https://github.com/Zokkyen/Launcher-Zokkymon/releases/download/v0.2.2/ZokkymonLauncher.exe",
+<<<<<<< HEAD
   "sha256": "6407ce9e53203a654ffee1f0c1a56a3a7a5369b6e32f830f6838c84970cc90eb"
+=======
+  "sha256": "b681e583b720b35405ba2210e4f3a7a3ac49b478fd25297054b18887ed65defe",
+  "changelog": "- UI/UX retravaillée (barre d'actions allégée, badges Release Notes/GitHub).\n- Système de logs professionnel (~/.zokkymon/logs) : auto-scroll, export complet/ciblé, rapports incidents.\n- Rotation et rétention des logs + nettoyage manuel depuis l'interface.\n- Canal de mise à jour stable/beta configurable.\n- Health-check pré-lancement (disque, RAM, Java, endpoints) avec diagnostic clair.\n- Mode Réparer l'installation (ciblé, sans suppression complète).\n- Profils de lancement (performance, quality, low-end, custom) + JVM args personnalisés.\n- Sauvegarde/restauration configs joueur et scan mods avant lancement."
+>>>>>>> 37d4329 (release: prepare 0.3.0 metadata and launcher updates)
 }
