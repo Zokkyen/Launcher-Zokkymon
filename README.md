@@ -74,7 +74,9 @@ ZokkymonLauncher/
 │   └── version.json.example    # Format du fichier version du modpack
 ├── info.json                   # Version + URL + SHA256 du dernier EXE publié
 ├── .github/workflows/
-│   └── update-info.yml         # Met à jour info.json automatiquement à la release
+│   ├── beta-auto-release.yml   # Build EXE + pre-release beta + update info.json (beta)
+│   ├── promote-stable.yml      # Promotion stable + build EXE + update info.json (main)
+│   └── update-info.yml         # Fallback: met à jour info.json après release publiée manuellement
 ├── launch4j.xml                # Config Launch4j pour la génération de l'EXE
 └── pom.xml
 ```
@@ -168,14 +170,19 @@ Copier `config/launcher_config.json` depuis la config embarquée et remplir les 
 
 ## Système de mise à jour du launcher
 
-À chaque publication d'une release GitHub, le workflow `.github/workflows/update-info.yml` :
+Le process principal est désormais :
 
-1. Télécharge l'EXE attaché à la release
-2. Calcule son SHA-256
-3. Met à jour `info.json` (version, URL, hash) sur la branche correspondante :
-  - pre-release → `beta`
-  - release stable → `main`
-  - vérification SHA-256 ajoutée pour chaque artefact publié
+1. `beta-auto-release.yml` (sur push `beta`) :
+  - build JAR + EXE,
+  - crée une pre-release GitHub,
+  - met à jour `info.json` directement sur `beta` (version, URL, SHA-256, changelog).
+2. `promote-stable.yml` (manuel) :
+  - fusion optionnelle `beta` → `main` (en conservant `README.md` de `main`),
+  - build JAR + EXE,
+  - crée la release stable,
+  - met à jour `info.json` directement sur `main`.
+
+Le workflow `update-info.yml` reste disponible comme **fallback** si une release est publiée manuellement hors des workflows ci-dessus.
 
 Au démarrage, le launcher compare `launcherVersion` (config) avec `info.json` distant et propose la mise à jour si nécessaire.
 
@@ -187,7 +194,7 @@ Au démarrage, le launcher compare `launcherVersion` (config) avec `info.json` d
 
 - Workflow : `.github/workflows/beta-auto-release.yml`
 - Déclenchement : automatique sur push `beta` (hors commits du bot GitHub Actions)
-- Effet : build JAR + build EXE + création d'une pre-release GitHub + update automatique de `info.json` via `update-info.yml`
+- Effet : build JAR + build EXE + création d'une pre-release GitHub + update directe de `info.json` sur `beta`
 
 Avant de push sur `beta`, complète si besoin :
 
@@ -208,6 +215,11 @@ Avant de lancer la promotion stable, complète si besoin :
 - `release-notes/pending-main.md`
 
 Comme pour la beta, la note devient le changelog final dans la release et `info.json`.
+
+### 3) Fallback (release manuelle)
+
+Si tu publies une release manuellement via GitHub (sans passer par les workflows d'automatisation),
+`update-info.yml` mettra `info.json` à jour à partir de l'asset `ZokkymonLauncher.exe` et du body de release.
 
 ---
 
