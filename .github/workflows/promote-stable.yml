@@ -119,33 +119,30 @@ jobs:
 
           Set-Content -Path $cfgPath -Value $xml -Encoding UTF8
 
-          $launch4jCmd = Get-Command launch4jc -ErrorAction SilentlyContinue
-          if (-not $launch4jCmd) {
-            $launch4jCmd = Get-Command launch4jc.exe -ErrorAction SilentlyContinue
-          }
-
-          $candidatePaths = @(
-            "C:\\ProgramData\\chocolatey\\lib\\launch4j\\tools\\launch4j\\launch4jc.exe",
-            "C:\\Program Files\\Launch4j\\launch4jc.exe",
-            "C:\\Program Files (x86)\\Launch4j\\launch4jc.exe"
+          $launch4jJarCandidates = @(
+            "C:\\ProgramData\\chocolatey\\lib\\launch4j\\tools\\launch4j\\launch4j.jar",
+            "C:\\Program Files\\Launch4j\\launch4j.jar",
+            "C:\\Program Files (x86)\\Launch4j\\launch4j.jar"
           )
 
-          if (-not $launch4jCmd) {
-            foreach ($candidate in $candidatePaths) {
-              if (Test-Path $candidate) {
-                $launch4jCmd = @{ Source = $candidate }
-                break
-              }
+          $launch4jJar = $null
+          foreach ($candidate in $launch4jJarCandidates) {
+            if (Test-Path $candidate) {
+              $launch4jJar = $candidate
+              break
             }
           }
 
-          if (-not $launch4jCmd) {
-            throw "launch4jc introuvable après installation Chocolatey."
+          if (-not $launch4jJar) {
+            throw "launch4j.jar introuvable après installation Chocolatey."
           }
 
-          & $launch4jCmd.Source $cfgPath
+          $launch4jHome = Split-Path -Parent $launch4jJar
+          $launch4jCp = "$launch4jJar;$launch4jHome\\lib\\*"
+
+          & java "-cp" $launch4jCp "net.sf.launch4j.Main" $cfgPath
           if ($LASTEXITCODE -ne 0) {
-            throw "Échec launch4jc (code=$LASTEXITCODE)"
+            throw "Échec Launch4j Java CLI (code=$LASTEXITCODE)"
           }
 
           if (!(Test-Path $exePath)) { throw "EXE non généré: $exePath" }
