@@ -75,6 +75,14 @@ Ce launcher n’est pas affilié aux créateurs officiels du modpack.
 
 ---
 
+## 🔄 Mises à jour
+
+- Les versions de test sortent d’abord en **beta**.
+- Les versions stables arrivent ensuite sur **main** (celle recommandée pour tout le monde).
+- À chaque release, l’EXE et les infos de version sont publiés automatiquement.
+
+---
+
 ## ⚠️ Disclaimer
 
 Ce projet :
