@@ -3,6 +3,7 @@ package com.zokkymon.launcher;
 import com.formdev.flatlaf.FlatDarkLaf;
 import javax.imageio.ImageIO;
 import javax.swing.*;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -1846,12 +1847,10 @@ public class LauncherGUI extends JFrame {
         appendLog("\n>> Mise à jour du modpack...");
         new Thread(() -> {
             try {
-                File[] old = new File(config.getInstallPath())
-                    .listFiles(d -> d.isDirectory() && d.getName().startsWith("zokkymon_v"));
-                if (old != null) for (File d : old) {
-                    appendLog("[*] Suppression : " + d.getName());
-                    deleteDirectory(d);
-                }
+                // Sauvegarde silencieuse des préférences joueur avant la MAJ.
+                File previousDir = findLatestInstalledModpackDir();
+                File autoBackup = backupPlayerConfigsForUpdate(previousDir);
+
                 if (!updater.downloadAndExtractModpack()) {
                     setStatus("Erreur de mise à jour");
                     SwingUtilities.invokeLater(() -> {
@@ -1860,6 +1859,16 @@ public class LauncherGUI extends JFrame {
                     });
                     return;
                 }
+
+                // Restaure les préférences dans le nouveau dossier, puis nettoie les anciennes versions.
+                File updatedDir = resolveCurrentInstalledModpackDir();
+                if (autoBackup != null && updatedDir != null) {
+                    int restored = restorePlayerConfigsFromBackup(autoBackup, updatedDir);
+                    appendLog("[Backup] Restauration automatique: " + restored + " élément(s) dans " + updatedDir.getName());
+                    deleteDirectory(autoBackup);
+                }
+                cleanupOldModpackDirsExcept(updatedDir);
+
                 cachedModpackStatus = "uptodate";
                 setProgress(100);
                 setStatus("Prêt à jouer");
@@ -1902,6 +1911,90 @@ public class LauncherGUI extends JFrame {
 
     private File getPlayerConfigBackupRoot() {
         return new File(System.getProperty("user.home"), ".zokkymon/backups/player-configs");
+    }
+
+    private File resolveCurrentInstalledModpackDir() {
+        String currentVersion = config.getModpackVersion();
+        if (currentVersion != null && !currentVersion.isBlank()) {
+            File byVersion = new File(config.getInstallPath(), "zokkymon_v" + currentVersion);
+            if (byVersion.isDirectory()) return byVersion;
+        }
+        return findLatestInstalledModpackDir();
+    }
+
+    private File backupPlayerConfigsForUpdate(File sourceGameDir) {
+        if (sourceGameDir == null || !sourceGameDir.isDirectory()) {
+            appendLog("[Backup] Aucun modpack existant à sauvegarder avant MAJ.");
+            return null;
+        }
+
+        try {
+            File backupRoot = getPlayerConfigBackupRoot();
+            if (!backupRoot.exists()) backupRoot.mkdirs();
+
+            File backupDir = new File(backupRoot, "auto-update-" + LOG_FILE_TS.format(LocalDateTime.now()));
+            backupDir.mkdirs();
+
+            List<String> singleFiles = List.of("options.txt", "optionsof.txt", "keybindings.txt");
+            List<String> folders = List.of("shaderpacks", "resourcepacks");
+
+            int copied = 0;
+            for (String name : singleFiles) {
+                File src = new File(sourceGameDir, name);
+                if (src.exists() && src.isFile()) {
+                    copyRecursively(src.toPath(), new File(backupDir, name).toPath());
+                    copied++;
+                }
+            }
+            for (String name : folders) {
+                File src = new File(sourceGameDir, name);
+                if (src.exists() && src.isDirectory()) {
+                    copyRecursively(src.toPath(), new File(backupDir, name).toPath());
+                    copied++;
+                }
+            }
+
+            if (copied == 0) {
+                appendLog("[Backup] Aucun fichier joueur à préserver avant MAJ.");
+                deleteDirectory(backupDir);
+                return null;
+            }
+
+            appendLog("[Backup] Sauvegarde automatique créée: " + backupDir.getName() + " (" + copied + " élément(s)).");
+            return backupDir;
+        } catch (Exception e) {
+            appendLog("[Backup] Sauvegarde automatique échouée: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private int restorePlayerConfigsFromBackup(File backupDir, File targetGameDir) {
+        if (backupDir == null || targetGameDir == null || !backupDir.isDirectory() || !targetGameDir.isDirectory()) {
+            return 0;
+        }
+
+        int restored = 0;
+        try (var stream = Files.list(backupDir.toPath())) {
+            for (Path child : stream.toList()) {
+                copyRecursively(child, targetGameDir.toPath().resolve(child.getFileName()));
+                restored++;
+            }
+        } catch (Exception e) {
+            appendLog("[Backup] Restauration automatique échouée: " + e.getMessage());
+        }
+        return restored;
+    }
+
+    private void cleanupOldModpackDirsExcept(File keepDir) {
+        File[] all = new File(config.getInstallPath())
+            .listFiles(d -> d.isDirectory() && d.getName().startsWith("zokkymon_v"));
+        if (all == null) return;
+
+        for (File dir : all) {
+            if (keepDir != null && dir.equals(keepDir)) continue;
+            appendLog("[*] Suppression ancienne version : " + dir.getName());
+            deleteDirectory(dir);
+        }
     }
 
     private void backupPlayerConfigs() {
@@ -2049,7 +2142,7 @@ public class LauncherGUI extends JFrame {
             JSONObject launcherInfo = updater.getLauncherInfo();
             sb.append("Version distante: ").append(launcherInfo.optString("version", "?"))
               .append("\n");
-            String launcherNotes = launcherInfo.optString("changelog", "");
+            String launcherNotes = extractChangelogText(launcherInfo);
             if (!launcherNotes.isBlank()) sb.append("\n").append(launcherNotes).append("\n");
             else sb.append("(Pas de champ 'changelog' dans info.json launcher)\n");
         } catch (Exception e) {
@@ -2061,7 +2154,7 @@ public class LauncherGUI extends JFrame {
             JSONObject modpackInfo = fetchModpackInfoJson();
             sb.append("Version distante: ").append(modpackInfo.optString("version", "?"))
               .append("\n");
-            String modpackNotes = modpackInfo.optString("changelog", "");
+            String modpackNotes = extractChangelogText(modpackInfo);
             if (!modpackNotes.isBlank()) sb.append("\n").append(modpackNotes).append("\n");
             else sb.append("(Pas de champ 'changelog' dans info.json modpack)\n");
         } catch (Exception e) {
@@ -2108,6 +2201,33 @@ public class LauncherGUI extends JFrame {
 
         dialog.setContentPane(cp);
         dialog.setVisible(true);
+    }
+
+    private String extractChangelogText(JSONObject info) {
+        if (info == null) return "";
+
+        String text = info.optString("changelog", "").trim();
+        if (!text.isBlank()) return text;
+
+        text = info.optString("releaseNotes", "").trim();
+        if (!text.isBlank()) return text;
+
+        text = info.optString("notes", "").trim();
+        if (!text.isBlank()) return text;
+
+        JSONArray arr = info.optJSONArray("changelog");
+        if (arr != null && arr.length() > 0) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < arr.length(); i++) {
+                String line = arr.optString(i, "").trim();
+                if (line.isBlank()) continue;
+                if (sb.length() > 0) sb.append('\n');
+                sb.append("- ").append(line);
+            }
+            return sb.toString();
+        }
+
+        return "";
     }
 
     private String normalizeModKey(String fileName) {
