@@ -2127,12 +2127,23 @@ public class LauncherGUI extends JFrame {
 
     private JSONObject fetchModpackInfoJson() throws Exception {
         String token = config.getModpackToken();
-        String url = config.getModpackInfoUrl();
-        if (token != null && !token.isBlank()) {
-            url = url + (url.contains("?") ? "&" : "?")
-                + "token=" + java.net.URLEncoder.encode(token, StandardCharsets.UTF_8);
+        String baseUrl = config.getModpackInfoUrl();
+        if (token == null || token.isBlank()) {
+            return new JSONObject(readUrlText(baseUrl));
         }
-        return new JSONObject(readUrlText(url));
+
+        String tokenizedUrl = baseUrl + (baseUrl.contains("?") ? "&" : "?")
+            + "token=" + java.net.URLEncoder.encode(token, StandardCharsets.UTF_8);
+        try {
+            return new JSONObject(readUrlText(tokenizedUrl));
+        } catch (IOException e) {
+            String msg = e.getMessage() != null ? e.getMessage() : "";
+            if (msg.contains("HTTP 401") || msg.contains("HTTP 403")) {
+                appendLog("[WARN] Endpoint modpack refuse le token pour le changelog, fallback sans token.");
+                return new JSONObject(readUrlText(baseUrl));
+            }
+            throw e;
+        }
     }
 
     private void showChangelogDialog() {

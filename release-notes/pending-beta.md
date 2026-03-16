@@ -18,6 +18,7 @@
 	- Gestion des conflits bibliothèques (`gson`) améliorée pour éviter certains crashes d'init mods
 	- Purge préventive de `slf4j-simple*.jar` injecté localement (évite les boucles de logs fatales)
 	- Changelog launcher/modpack plus tolérant : support de `changelog`, `releaseNotes`, `notes` et `changelog[]`
+	- Fallback réseau modpack : si l'endpoint avec token répond `401/403`, nouvelle tentative automatique sans token
 	- Mise à jour modpack sécurisée : sauvegarde auto des configs joueur, restauration auto après update, puis purge des anciennes versions
 
 ## ⚠️ À tester

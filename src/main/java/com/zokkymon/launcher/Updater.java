@@ -105,9 +105,21 @@ public class Updater {
     }
 
     private String readUrlWithToken(String baseUrl, String token) throws IOException {
+        if (token == null || token.isBlank()) {
+            return readUrl(baseUrl);
+        }
         String separator = baseUrl.contains("?") ? "&" : "?";
         String urlStr = baseUrl + separator + "token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
-        return readUrl(urlStr);
+        try {
+            return readUrl(urlStr);
+        } catch (IOException e) {
+            String msg = e.getMessage() != null ? e.getMessage() : "";
+            if (msg.contains("HTTP 401") || msg.contains("HTTP 403")) {
+                gui.appendLog("[WARN] Token modpack refusé (" + msg + ") - nouvelle tentative sans token.");
+                return readUrl(baseUrl);
+            }
+            throw e;
+        }
     }
 
     // --------- Modpack update helpers ---------
