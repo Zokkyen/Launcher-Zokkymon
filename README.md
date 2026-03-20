@@ -46,12 +46,18 @@ Le serveur fonctionne avec :
 - Whitelist activée
 - Vérification d’authentification officielle Microsoft/Minecraft
 - Distribution contrôlée du modpack
+- Vérification antivirus automatisée des builds EXE via VirusTotal
 
 L’idée, c’est de garantir :
 
 - Une expérience sécurisée
 - Aucune usurpation d’identité
 - Un environnement sain
+
+Sur la branche beta, chaque EXE généré passe par un scan VirusTotal pendant le workflow de release.
+Les rapports sont publiés dans `security-reports/` (dont `virustotal-beta-latest.md`) pour audit rapide.
+
+En pratique, avant diffusion, on vérifie que le build ne présente pas de signalement malveillant dans le rapport automatique.
 
 ---
 
