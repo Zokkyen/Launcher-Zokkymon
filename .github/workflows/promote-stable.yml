@@ -170,6 +170,83 @@ jobs:
           }
           Get-Item "ZokkymonLauncher.exe" | Select-Object FullName, Length, LastWriteTime
 
+      - name: VirusTotal scan (stable)
+        shell: pwsh
+        env:
+          VT_API_KEY: ${{ secrets.VT_API_KEY }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:VT_API_KEY)) {
+            Write-Host "VT_API_KEY absent: scan VirusTotal ignoré."
+            exit 0
+          }
+
+          $version = "${{ inputs.stable_version }}"
+          $sha = (Get-FileHash -Path "ZokkymonLauncher.exe" -Algorithm SHA256).Hash.ToLower()
+          $reportDir = "security-reports"
+          New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
+
+          $headers = @{ "x-apikey" = $env:VT_API_KEY }
+          $stats = $null
+          $scanSource = "existing"
+
+          try {
+            $fileInfo = Invoke-RestMethod -Method Get -Uri "https://www.virustotal.com/api/v3/files/$sha" -Headers $headers
+            $stats = $fileInfo.data.attributes.last_analysis_stats
+          } catch {
+            $statusCode = $_.Exception.Response.StatusCode.value__
+            if ($statusCode -ne 404) { throw }
+
+            $scanSource = "uploaded"
+            $upload = Invoke-RestMethod -Method Post -Uri "https://www.virustotal.com/api/v3/files" -Headers $headers -Form @{ file = Get-Item "ZokkymonLauncher.exe" }
+            $analysisId = $upload.data.id
+            if (-not $analysisId) { throw "VirusTotal: id d'analyse manquant après upload." }
+
+            $completed = $false
+            for ($i = 0; $i -lt 40; $i++) {
+              Start-Sleep -Seconds 15
+              $analysis = Invoke-RestMethod -Method Get -Uri "https://www.virustotal.com/api/v3/analyses/$analysisId" -Headers $headers
+              if ($analysis.data.attributes.status -eq "completed") {
+                $completed = $true
+                break
+              }
+            }
+
+            if (-not $completed) {
+              throw "VirusTotal: délai dépassé en attente d'analyse."
+            }
+
+            $fileInfo = Invoke-RestMethod -Method Get -Uri "https://www.virustotal.com/api/v3/files/$sha" -Headers $headers
+            $stats = $fileInfo.data.attributes.last_analysis_stats
+          }
+
+          if ($null -eq $stats) {
+            throw "VirusTotal: statistiques d'analyse indisponibles."
+          }
+
+          $vtLink = "https://www.virustotal.com/gui/file/$sha/detection"
+          $now = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss 'UTC'", [System.Globalization.CultureInfo]::InvariantCulture)
+
+          $summary = @"
+          # VirusTotal Report (stable v$version)
+
+          - Date: $now
+          - SHA-256: `$sha`
+          - Source: $scanSource
+          - Lien: $vtLink
+
+          ## Stats
+          - malicious: $($stats.malicious)
+          - suspicious: $($stats.suspicious)
+          - undetected: $($stats.undetected)
+          - harmless: $($stats.harmless)
+          - timeout: $($stats.timeout)
+          - failure: $($stats.failure)
+          - type-unsupported: $($stats.'type-unsupported')
+          "@
+
+          Set-Content -Path "$reportDir/virustotal-v$version.md" -Value $summary -Encoding UTF8
+          Set-Content -Path "$reportDir/virustotal-latest.md" -Value $summary -Encoding UTF8
+
       - name: Prepare stable release notes
         shell: pwsh
         run: |
@@ -224,9 +301,12 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add info.json
+          if (Test-Path "security-reports") {
+            git add security-reports/*.md
+          }
           if (git diff --cached --quiet) {
             Write-Host "Aucun changement info.json à commit."
             exit 0
           }
-          git commit -m "chore(main): update info.json -> v${{ inputs.stable_version }}"
+          git commit -m "chore(main): update info.json + VirusTotal report -> v${{ inputs.stable_version }}"
           git push origin main
