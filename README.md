@@ -46,12 +46,15 @@ Le serveur fonctionne avec :
 - Whitelist activée
 - Vérification d’authentification officielle Microsoft/Minecraft
 - Distribution contrôlée du modpack
+- Vérification antivirus automatisée de l'EXE via VirusTotal lors des releases stables
 
 L’idée, c’est de garantir :
 
 - Une expérience sécurisée
 - Aucune usurpation d’identité
 - Un environnement sain
+
+Les résultats de scan sont publiés dans le dépôt pour garder une traçabilité simple des builds diffusés.
 
 ---
 
