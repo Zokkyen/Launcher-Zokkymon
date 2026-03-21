@@ -1,8 +1,7 @@
 name: Beta Auto Release
 
 on:
-  push:
-    branches: [beta]
+  # Déclenchement manuel uniquement pour éviter de publier un EXE à chaque push.
   workflow_dispatch:
 
 permissions:
