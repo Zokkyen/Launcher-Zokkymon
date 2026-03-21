@@ -154,6 +154,70 @@ jobs:
 
           if (!(Test-Path $exePath)) { throw "EXE non généré: $exePath" }
 
+      - name: Decode signing certificate
+        shell: pwsh
+        env:
+          SIGNING_CERT_BASE64: ${{ secrets.SIGNING_CERT_BASE64 }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:SIGNING_CERT_BASE64)) {
+            Write-Host "SIGNING_CERT_BASE64 absent: signature ignorée."
+            exit 0
+          }
+          [IO.File]::WriteAllBytes("codesign.pfx", [Convert]::FromBase64String($env:SIGNING_CERT_BASE64))
+
+      - name: Sign EXE
+        shell: pwsh
+        env:
+          SIGNING_CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
+        run: |
+          if (!(Test-Path "codesign.pfx")) {
+            Write-Host "PFX absent: signature ignorée."
+            exit 0
+          }
+          if ([string]::IsNullOrWhiteSpace($env:SIGNING_CERT_PASSWORD)) {
+            throw "SIGNING_CERT_PASSWORD manquant."
+          }
+
+          $signtool = (Get-Command signtool.exe -ErrorAction SilentlyContinue).Source
+          if (-not $signtool) {
+            $candidates = @(
+              "${env:ProgramFiles(x86)}\\Windows Kits\\10\\bin\\x64\\signtool.exe",
+              "${env:ProgramFiles(x86)}\\Windows Kits\\10\\App Certification Kit\\signtool.exe"
+            )
+            foreach ($c in $candidates) {
+              if (Test-Path $c) { $signtool = $c; break }
+            }
+          }
+          if (-not $signtool) {
+            throw "signtool.exe introuvable sur le runner."
+          }
+
+          & $signtool sign `
+            /fd SHA256 `
+            /f "codesign.pfx" `
+            /p "$env:SIGNING_CERT_PASSWORD" `
+            /tr "http://timestamp.digicert.com" `
+            /td SHA256 `
+            /d "Zokkymon Launcher" `
+            "ZokkymonLauncher.exe"
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Échec de signature Authenticode."
+          }
+
+      - name: Verify EXE signature
+        shell: pwsh
+        run: |
+          if (!(Test-Path "codesign.pfx")) {
+            Write-Host "Signature non configurée: vérification ignorée."
+            exit 0
+          }
+          $sig = Get-AuthenticodeSignature "ZokkymonLauncher.exe"
+          $sig | Format-List Status, StatusMessage
+          if ($sig.Status -ne "Valid") {
+            throw "Signature invalide: $($sig.Status) - $($sig.StatusMessage)"
+          }
+
       - name: Verify EXE output
         shell: pwsh
         run: |
