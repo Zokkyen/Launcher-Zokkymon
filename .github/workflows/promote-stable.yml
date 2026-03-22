@@ -221,10 +221,26 @@ jobs:
             exit 0
           }
           $sig = Get-AuthenticodeSignature "ZokkymonLauncher.exe"
-          $sig | Format-List Status, StatusMessage
-          if ($sig.Status -ne "Valid") {
-            throw "Signature invalide: $($sig.Status) - $($sig.StatusMessage)"
+          $sig | Format-List Status, StatusMessage, SignerCertificate
+
+          # Cas attendu avec certificat auto-signé: signature présente mais chaîne non approuvée.
+          if ($sig.Status -eq "Valid") {
+            Write-Host "Signature Authenticode valide."
+            exit 0
           }
+
+          $msg = "$($sig.StatusMessage)"
+          $hasSigner = $null -ne $sig.SignerCertificate
+          $isSelfSignedTrustIssue = ($sig.Status -eq "UnknownError") -and $hasSigner -and (
+            $msg -match "not trusted" -or $msg -match "non approuv" -or $msg -match "root certificate"
+          )
+
+          if ($isSelfSignedTrustIssue) {
+            Write-Host "Signature présente (certificat auto-signé non approuvé sur le runner): vérification acceptée."
+            exit 0
+          }
+
+          throw "Signature invalide: $($sig.Status) - $($sig.StatusMessage)"
 
       - name: Verify EXE output
         shell: pwsh
