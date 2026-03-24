@@ -178,6 +178,12 @@ jobs:
         env:
           SIGNING_CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
         run: |
+          $usesWrappedJar = Select-String -Path "launch4j-ci.xml" -Pattern "<dontWrapJar>false</dontWrapJar>" -Quiet
+          if ($usesWrappedJar) {
+            Write-Host "EXE Launch4j en mode wrapped detecte: signature Authenticode ignoree (peut casser java -jar)."
+            exit 0
+          }
+
           if (!(Test-Path "codesign.pfx")) {
             Write-Host "PFX absent: signature ignorée."
             exit 0
@@ -216,6 +222,12 @@ jobs:
       - name: Verify EXE signature
         shell: pwsh
         run: |
+          $usesWrappedJar = Select-String -Path "launch4j-ci.xml" -Pattern "<dontWrapJar>false</dontWrapJar>" -Quiet
+          if ($usesWrappedJar) {
+            Write-Host "EXE Launch4j en mode wrapped detecte: verification signature ignoree."
+            exit 0
+          }
+
           if (!(Test-Path "codesign.pfx")) {
             Write-Host "Signature non configurée: vérification ignorée."
             exit 0
@@ -249,6 +261,14 @@ jobs:
             throw "EXE absent à la racine du workspace"
           }
           Get-Item "ZokkymonLauncher.exe" | Select-Object FullName, Length, LastWriteTime
+
+      - name: Validate wrapped JAR payload
+        shell: pwsh
+        run: |
+          & jar tf "ZokkymonLauncher.exe" | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            throw "EXE invalide: payload JAR illisible (jar tf a echoue)."
+          }
 
       - name: VirusTotal scan (stable)
         shell: pwsh
