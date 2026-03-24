@@ -1,15 +1,15 @@
 # VirusTotal Report (stable v0.4.0)
 
-- Date: 2026-03-24 10:29:47 UTC
+- Date: 2026-03-24 11:05:32 UTC
 - SHA-256: $sha
 - Source: uploaded
-- Lien: https://www.virustotal.com/gui/file/5c182e94b00eac7db9c68fc1034923b0c61818f2d42e02d2e08ac33a42392336/detection
+- Lien: https://www.virustotal.com/gui/file/6e9c9682a3171461e73f48ecf2cea433960c96861236faeb13beaf7d9e4c2949/detection
 
 ## Stats
-- malicious: 1
+- malicious: 0
 - suspicious: 0
-- undetected: 71
+- undetected: 64
 - harmless: 0
-- timeout: 0
-- failure: 0
+- timeout: 7
+- failure: 1
 - type-unsupported: 4
