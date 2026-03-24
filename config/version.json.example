@@ -1,7 +1,7 @@
 {
   "version": "0.0.2",
   "minecraftVersion": "1.21.1",
-  "fabricVersion": "0.17.3",
+  "fabricVersion": "0.18.4",
   "modpackName": "Zokkymon",
   "files": [
     {

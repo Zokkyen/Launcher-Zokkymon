@@ -138,7 +138,7 @@ public class ConfigManager {
     }
     public String getServerUrl()        { return jarConfig.optString("serverUrl", ""); }
     public String getMinecraftVersion() { return jarConfig.optString("minecraftVersion", "1.21.1"); }
-    public String getFabricVersion()    { return jarConfig.optString("fabricVersion", "0.18.1"); }
+    public String getFabricVersion()    { return jarConfig.optString("fabricVersion", "0.18.4"); }
     public String getModpackName()      { return jarConfig.optString("modpackName", "Zokkymon"); }
     public String getLauncherExeName()  { return jarConfig.optString("launcherExeName", "ZokkymonLauncher.exe"); }
     public String getModpackInfoUrl()   { return jarConfig.optString("modpackInfoUrl", ""); }
