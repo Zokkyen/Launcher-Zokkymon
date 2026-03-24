@@ -39,6 +39,9 @@ config/launcher_config.json
 # KeyStore local (clé AES machine) — propre à chaque installation
 **/.ks
 
+# ── Photos personnelles ───────────────────────────────────────────────────────
+Zokkyen(steve).png
+
 # ── OS ────────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
