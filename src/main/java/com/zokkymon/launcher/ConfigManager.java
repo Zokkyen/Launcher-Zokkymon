@@ -145,7 +145,26 @@ public class ConfigManager {
     public boolean isVersionCheckEnabled() { return jarConfig.optBoolean("enableVersionCheck", true); }
 
     public String getClientId() {
-        return jarConfig.optString("msaClientId", "").strip();
+        String embedded = jarConfig.optString("msaClientId", "").strip();
+        if (!embedded.isBlank()) return embedded;
+
+        // Fallback 1: variable d'environnement pour dépannage rapide sans rebuild.
+        String env = System.getenv("ZOKKYMON_MSA_CLIENT_ID");
+        if (env != null && !env.isBlank()) return env.strip();
+
+        // Fallback 2: fichier config externe (utile si la config embarquée est vide).
+        try {
+            Path externalConfig = Paths.get("config", "launcher_config.json");
+            if (Files.exists(externalConfig)) {
+                JSONObject ext = new JSONObject(new String(Files.readAllBytes(externalConfig)));
+                String extId = ext.optString("msaClientId", "").strip();
+                if (!extId.isBlank()) return extId;
+            }
+        } catch (Exception ignored) {
+            // On reste non-bloquant: le launcher continuera à signaler l'absence de client ID.
+        }
+
+        return "";
     }
 
     public String getLauncherInfoUrl() {

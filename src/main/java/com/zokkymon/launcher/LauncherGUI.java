@@ -1149,7 +1149,7 @@ public class LauncherGUI extends JFrame {
         copyBtn.addActionListener(ev -> {
             java.awt.Toolkit.getDefaultToolkit().getSystemClipboard()
                 .setContents(new java.awt.datatransfer.StringSelection(dcr.userCode), null);
-            copyBtn.setText("\u2713 Copié !");
+            copyBtn.setText("Copié !");
         });
         openBtn.addActionListener(ev -> {
             try { java.awt.Desktop.getDesktop().browse(new java.net.URI(dcr.verificationUri)); }
