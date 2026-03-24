@@ -8,6 +8,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URLEncoder;
+import java.text.Normalizer;
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -152,12 +153,34 @@ public class MicrosoftAuth {
         }
 
         return new DeviceCodeResult(
-            resp.getString("user_code"),
+            normalizeUserCode(resp.getString("user_code")),
             resp.getString("verification_uri"),
             resp.getString("device_code"),
             resp.optInt("interval",   5),
             resp.optInt("expires_in", 900)
         );
+    }
+
+    /**
+     * Normalise le user_code Microsoft pour éviter les glyphes non supportés
+     * (ex: tirets Unicode affichés en carrés selon la police/système).
+     */
+    private static String normalizeUserCode(String raw) {
+        if (raw == null) return "";
+        String normalized = Normalizer.normalize(raw, Normalizer.Form.NFKC).trim();
+        StringBuilder out = new StringBuilder(normalized.length());
+        for (int i = 0; i < normalized.length(); i++) {
+            char c = normalized.charAt(i);
+            if (Character.isLetterOrDigit(c)) {
+                out.append(Character.toUpperCase(c));
+                continue;
+            }
+            // Tous les séparateurs courants deviennent un tiret ASCII.
+            if (Character.getType(c) == Character.DASH_PUNCTUATION || c == '_' || Character.isWhitespace(c)) {
+                out.append('-');
+            }
+        }
+        return out.toString().replaceAll("-+", "-");
     }
 
     /**
