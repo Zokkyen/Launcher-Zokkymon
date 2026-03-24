@@ -1,115 +1,112 @@
-# Zokkymon Launcher - Branche beta
+<p align="center">
+  <img src="launcher.png" alt="Zokkymon Banner" width="800"/>
+</p>
 
-Launcher Java/Swing pour Minecraft Fabric avec mise à jour automatique du modpack,
-authentification Microsoft et publication continue des pre-releases.
+<h1 align="center">Launcher Zokkymon</h1>
 
-Cette branche beta contient le développement actif.
-Les releases stables sont publiées sur main.
-
----
-
-## Fonctionnalités
-
-- Authentification Microsoft (Device Code Flow -> Xbox -> XSTS -> Minecraft)
-- Vérification + téléchargement automatique du modpack avec contrôle SHA-256
-- Mise à jour automatique du launcher via info.json distant
-- Installation Java/Fabric et lancement Minecraft via process dédié
-- UI Swing personnalisée + thèmes clair/sombre
-- Stockage chiffré des tokens MSA (AES-256-GCM)
+<p align="center">
+Un launcher fait maison par <b>Zokkyen</b> pour lancer Zokkymon facilement entre amis, sans prise de tête.
+</p>
 
 ---
 
-## Stack technique
+## 🎮 À propos du projet
 
-| Composant | Version cible |
-|---|---|
-| Java | 21 |
-| Maven | 3.8+ |
-| FlatLaf | 3.5.4 |
-| Plateforme cible | Windows (EXE via Launch4j) |
+**Launcher Zokkymon** est un projet perso/communautaire pour simplifier la vie des joueurs : tu installes, tu te connectes, tu joues.
 
----
+Ce launcher permet :
 
-## Structure principale
+- D’installer automatiquement le modpack
+- De garder le jeu à jour
+- De se connecter simplement au serveur
+- D’avoir une expérience stable pour toute la communauté
 
-```text
-ZokkymonLauncher/
-|- src/main/java/com/zokkymon/launcher/
-|  |- Main.java
-|  |- LauncherGUI.java
-|  |- Launcher.java
-|  |- Updater.java
-|  |- ConfigManager.java
-|  |- MicrosoftAuth.java
-|  |- SecureStorage.java
-|- src/main/resources/
-|  |- launcher_config.json
-|- config/
-|  |- launcher_config.json
-|- release-notes/
-|  |- pending-beta.md
-|  |- pending-main.md
-|- security-reports/
-|  |- virustotal-beta-latest.md
-|- .github/workflows/
-|  |- beta-auto-release.yml
-|  |- promote-stable.yml
-|  |- update-info.yml
-|- info.json
-|- pom.xml
-```
+Il n’a **aucun objectif commercial**.
 
 ---
 
-## Build local
+## 🌍 Objectif
 
-```bash
-mvn clean package
-```
+Créer un espace de jeu privé autour de **Cobblemon Academy 2**, avec :
 
-Produit principal : target/ZokkymonLauncher.jar.
+- Une infrastructure stable
+- Un serveur sécurisé
+- Une gestion propre des versions
+- Un esprit communautaire
 
-Pour l'EXE local : scripts build-local-exe.ps1 / build-local-exe.cmd.
-
----
-
-## Configuration locale
-
-Le fichier config/launcher_config.json contient les paramètres machine et les
-valeurs sensibles (client id MSA, token modpack, urls), et ne doit pas être
-commit.
+Le but est simple : jouer ensemble dans de bonnes conditions, avec un launcher fiable et agréable à utiliser.
 
 ---
 
-## Sécurité et vérification binaire
+## 🔐 Sécurité
 
-- Les tokens MSA sont stockés chiffrés sur disque via SecureStorage.
-- Les artefacts modpack sont vérifiés par SHA-256.
-- En beta, l'EXE généré est scanné automatiquement via VirusTotal pendant le workflow.
-- Les rapports sont publiés dans security-reports/
-  (notamment virustotal-beta-latest.md).
+Le serveur fonctionne avec :
 
-Avant diffusion d'une build, vérifier le rapport VirusTotal et confirmer
-que les indicateurs malveillants/suspects ne remontent pas d'anomalie.
+- `online-mode=true`
+- Whitelist activée
+- Vérification d’authentification officielle Microsoft/Minecraft
+- Distribution contrôlée du modpack
+- Vérification antivirus automatisée de l'EXE via VirusTotal lors des releases stables
 
----
+L’idée, c’est de garantir :
 
-## CI/CD (beta)
+- Une expérience sécurisée
+- Aucune usurpation d’identité
+- Un environnement sain
 
-Workflow principal : .github/workflows/beta-auto-release.yml
-
-Pipeline :
-1. calcule la prochaine version beta
-2. compile le jar et génère l'EXE
-3. publie la pre-release GitHub
-4. met à jour info.json
-5. génère/publie le rapport VirusTotal
+Les résultats de scan sont publiés dans le dépôt pour garder une traçabilité simple des builds diffusés.
 
 ---
 
-## Branches
+## ⚙️ Fonctionnalités du launcher
 
-| Branche | Role |
-|---|---|
-| main | Releases stables |
-| beta | Développement + pre-releases |
+- Installation automatique de Java
+- Installation de Fabric
+- Téléchargement et mise à jour automatiques du modpack (vérification SHA-256)
+- Progression unifiée lors du téléchargement et de l'extraction
+- Authentification officielle Microsoft / Minecraft
+- Interface en mode **clair** ou **sombre** (bascule intégrée)
+- Stockage sécurisé des tokens (chiffrement AES-256-GCM)
+
+---
+
+## 📦 À propos du modpack
+
+Le modpack est basé sur **Cobblemon Academy 2** et peut inclure des ajustements spécifiques pour notre serveur.
+
+Ce launcher n’est pas affilié aux créateurs officiels du modpack.
+
+---
+
+## 🔄 Mises à jour
+
+- Les versions de test sortent d’abord en **beta**.
+- Les versions stables arrivent ensuite sur **main** (celle recommandée pour tout le monde).
+- À chaque release, l’EXE et les infos de version sont publiés automatiquement.
+
+Pour les détails techniques (workflows, CI/CD, process de release), voir la branche **beta**.
+
+---
+
+## ⚠️ Disclaimer
+
+Ce projet :
+
+- N’est pas affilié à Mojang, Microsoft ou aux créateurs de Cobblemon.
+- N’a aucun but commercial.
+- Ne distribue aucun contenu payant.
+- Nécessite un compte Minecraft officiel valide.
+- Les images sont, pour le moment, générées par IA et seront remplacées progressivement.
+
+---
+
+## 👤 Auteur
+
+Développé par **Zokkyen**  
+Projet communautaire privé.
+
+---
+
+<p align="center">
+Fait avec passion pour jouer entre amis 💛
+</p>
