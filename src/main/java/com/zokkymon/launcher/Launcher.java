@@ -420,7 +420,7 @@ public class Launcher {
         try {
             // Téléchargement
             downloadFileWithProgress(JRE_DOWNLOAD_URL, zipFile.getAbsolutePath(), gui);
-            verifyArtifactSha256OrThrow(zipFile, JRE_DOWNLOAD_URL, "JRE Temurin ZIP", gui);
+            verifyArtifactSha256FromSourceOrThrow(zipFile, JRE_DOWNLOAD_URL, "JRE Temurin ZIP", gui);
             gui.appendLog("[OK] Téléchargement terminé");
             gui.setProgress(50);
 
@@ -1311,20 +1311,30 @@ public class Launcher {
 
         String mavenJarName = "fabric-loader-" + fabricVersion + ".jar";
         String fabricMavenUrl = "https://maven.fabricmc.net/net/fabricmc/fabric-loader/" + fabricVersion + "/" + mavenJarName;
-        verifyArtifactSha256OrThrow(fabricJar, fabricMavenUrl, "Fabric Loader", gui);
+        String expected = fetchRemoteSha256(fabricMavenUrl);
+        if (expected == null || expected.isBlank()) {
+            gui.appendLog("[WARN] SHA-256 distant du Fabric Loader indisponible, vérification ignorée pour le lancement local.");
+            return;
+        }
+
+        verifyArtifactSha256OrThrow(fabricJar, expected, "Fabric Loader", gui);
     }
 
-    private static void verifyArtifactSha256OrThrow(File file, String sourceUrl, String label, LauncherGUI gui) throws Exception {
+    private static void verifyArtifactSha256FromSourceOrThrow(File file, String sourceUrl, String label, LauncherGUI gui) throws Exception {
         String expected = fetchRemoteSha256(sourceUrl);
         if (expected == null || expected.isBlank()) {
             throw new SecurityException("Checksum SHA-256 introuvable pour " + label + " (source: " + sourceUrl + ")");
         }
 
+        verifyArtifactSha256OrThrow(file, expected, label, gui);
+    }
+
+    private static void verifyArtifactSha256OrThrow(File file, String expectedSha256, String label, LauncherGUI gui) throws Exception {
         String actual = computeFileSha256(file);
-        if (!actual.equalsIgnoreCase(expected)) {
+        if (!actual.equalsIgnoreCase(expectedSha256)) {
             throw new SecurityException(
                 "SHA-256 invalide pour " + label + "\n" +
-                "Attendu : " + expected + "\n" +
+                "Attendu : " + expectedSha256 + "\n" +
                 "Calculé : " + actual
             );
         }

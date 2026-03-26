@@ -65,6 +65,9 @@ Les résultats de scan sont publiés dans le dépôt pour garder une traçabilit
 - Téléchargement et mise à jour automatiques du modpack (vérification SHA-256)
 - Progression unifiée lors du téléchargement et de l'extraction
 - Authentification officielle Microsoft / Minecraft
+- Mode local: si le serveur est hors ligne mais qu'un modpack est déjà installé, le launcher permet de jouer en local
+- Indicateurs serveur/local clairs dans l'interface (serveur en ligne/hors ligne, mod local disponible/indisponible)
+- Catalogue des mods intégré (recherche, tri, filtre de compatibilité, export CSV/JSON)
 - Interface en mode **clair** ou **sombre** (bascule intégrée)
 - Stockage sécurisé des tokens (chiffrement AES-256-GCM)
 
