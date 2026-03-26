@@ -1,16 +1,26 @@
 ## 🧪 Notes beta 0.4.1
 
 - Nouveautés launcher :
-	- Prise en charge de Fabric Loader 0.18.4 pour permettre l'ajout des mods qui exigent cette version.
+	- Prise en charge de Fabric Loader 0.18.4.
+	- Nouvelle fenêtre Catalogue des mods depuis la carte Mods installés.
+	- Recherche en direct des mods.
+	- Tri des mods par nom, version, taille et date.
+	- Filtre de compatibilité Tous / OK / A vérifier.
+	- Export du catalogue des mods en CSV et JSON.
 
-- Améliorations techniques :
-	- Alignement de la configuration locale, de la configuration embarquée et des exemples sur Fabric 0.18.4.
-	- Préparation de la prochaine stable 0.4.1 sur la branche main.
+- Améliorations offline/local :
+	- Lancement local autorisé si le serveur est hors ligne et qu'un modpack local est présent.
+	- Le bouton principal bascule automatiquement sur JOUER EN LOCAL dans ce cas.
+	- La carte serveur affiche maintenant Mod local disponible ou Mod local indisponible.
 
-- Correctifs de lancement :
-	- Réduction du risque d'incompatibilité au démarrage avec les mods récents ciblant Fabric 0.18.4.
+- Correctifs techniques :
+	- Vérification SHA Fabric assouplie en mode local si le checksum distant est indisponible.
+	- Correction du problème de signature de méthode autour de la vérification SHA des artefacts.
+	- Résolution plus robuste du dossier modpack local courant.
 
 ## ⚠️ À tester
 
-- Vérifier le téléchargement et le lancement corrects du profil en Fabric 0.18.4.
-- Vérifier la compatibilité du mod ajouté ainsi que du reste du pack avec ce loader.
+- Vérifier le parcours complet serveur hors ligne + modpack local présent.
+- Vérifier le comportement serveur hors ligne + aucun modpack local.
+- Vérifier le catalogue mods sur un pack volumineux (recherche, tri, filtre, export).
+- Vérifier la compatibilité du pack complet avec Fabric 0.18.4.

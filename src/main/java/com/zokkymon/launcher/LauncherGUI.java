@@ -3,12 +3,18 @@ package com.zokkymon.launcher;
 import com.formdev.flatlaf.FlatDarkLaf;
 import javax.imageio.ImageIO;
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import javax.swing.border.EmptyBorder;
+import javax.swing.table.AbstractTableModel;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.datatransfer.StringSelection;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -20,6 +26,7 @@ import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
@@ -30,8 +37,14 @@ import java.util.Map;
 import java.util.Locale;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.jar.Attributes;
+import java.util.jar.JarFile;
+import java.util.jar.Manifest;
+import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
 
 /**
  * Interface principale du launcher — Design moderne "Glassmorphism"
@@ -89,6 +102,7 @@ public class LauncherGUI extends JFrame {
     // ── Voyant serveur ───────────────────────────────────────────────────────
     private JLabel serverDot;
     private JLabel serverStatusLbl;
+    private JLabel serverModeLbl;
     private JButton serverRefreshBtn;
     private static final String SERVER_HOST = "zokkyen-cobblemon.ddns.net";
     private static final int    SERVER_PORT = 25565;
@@ -504,6 +518,12 @@ public class LauncherGUI extends JFrame {
         List<String> infos = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
         List<String> errors = new ArrayList<>();
+        File localModpackDir = resolveCurrentInstalledModpackDir();
+        boolean hasLocalModpack = localModpackDir != null && localModpackDir.isDirectory();
+
+        if (hasLocalModpack) {
+            infos.add("Modpack local détecté: " + localModpackDir.getName());
+        }
 
         // 1) Disque
         try {
@@ -555,11 +575,19 @@ public class LauncherGUI extends JFrame {
 
             String launcherErr = checkEndpointConnectivity(launcherInfoUrl, 5000);
             if (launcherErr == null) infos.add("Endpoint launcher: OK");
-            else warnings.add("Endpoint launcher inaccessible: " + launcherErr);
+            else if (hasLocalModpack) {
+                infos.add("Endpoint launcher inaccessible, mode local disponible: " + launcherErr);
+            } else {
+                warnings.add("Endpoint launcher inaccessible: " + launcherErr);
+            }
 
             String modpackErr = checkEndpointConnectivity(modpackInfoUrl, 5000);
             if (modpackErr == null) infos.add("Endpoint modpack: OK");
-            else warnings.add("Endpoint modpack inaccessible: " + modpackErr);
+            else if (hasLocalModpack) {
+                infos.add("Endpoint modpack inaccessible, lancement local autorisé: " + localModpackDir.getName());
+            } else {
+                warnings.add("Endpoint modpack inaccessible: " + modpackErr);
+            }
         } catch (Exception e) {
             warnings.add("Échec vérification connectivité: " + e.getMessage());
         }
@@ -640,8 +668,7 @@ public class LauncherGUI extends JFrame {
                         setProgress(100);
                         setStatus("Prêt à jouer");
                         playButton.setText("JOUER");
-                        playButton.setBackground(ACCENT);
-                        playButton.setEnabled(true);
+                        setReadyToPlayButtonState();
                     }
                 }
             });
@@ -650,6 +677,8 @@ public class LauncherGUI extends JFrame {
         if (cachedServerOnline != null) {
             final boolean s = cachedServerOnline;
             SwingUtilities.invokeLater(() -> applyServerState(s));
+        } else {
+            SwingUtilities.invokeLater(this::refreshServerLocalInfo);
         }
 
         if (cachedLauncherStatus != null) {
@@ -803,7 +832,9 @@ public class LauncherGUI extends JFrame {
 
         s.add(infoCard("Version du modpack", infoModpackVal));
         s.add(vSep(6));
-        s.add(infoCard("Mods installés",  infoModsVal));
+        JPanel modsCard = infoCard("Mods installés", infoModsVal);
+        attachModsCardActions(modsCard, infoModsVal);
+        s.add(modsCard);
         s.add(vSep(6));
         s.add(infoCard("RAM allouée",     infoRamVal));
         s.add(vSep(6));
@@ -873,7 +904,7 @@ public class LauncherGUI extends JFrame {
         };
         card.setOpaque(false);
         card.setBorder(new EmptyBorder(8, 12, 8, 12));
-        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 54));
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 66));
         card.setAlignmentX(LEFT_ALIGNMENT);
 
         serverDot = new JLabel("\u25cf");
@@ -882,7 +913,7 @@ public class LauncherGUI extends JFrame {
         serverDot.setHorizontalAlignment(SwingConstants.CENTER);
         serverDot.setPreferredSize(new Dimension(28, 28));
 
-        JPanel txt = new JPanel(new GridLayout(2, 1, 0, 1));
+        JPanel txt = new JPanel(new GridLayout(3, 1, 0, 1));
         txt.setOpaque(false);
         JLabel topLbl = new JLabel("SERVEUR");
         topLbl.setFont(new Font("Segoe UI", Font.BOLD, 9));
@@ -890,8 +921,12 @@ public class LauncherGUI extends JFrame {
         serverStatusLbl = new JLabel("Vérification...");
         serverStatusLbl.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         serverStatusLbl.setForeground(TEXT);
+        serverModeLbl = new JLabel("Modpack local indisponible");
+        serverModeLbl.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+        serverModeLbl.setForeground(TEXT_DIM);
         txt.add(topLbl);
         txt.add(serverStatusLbl);
+        txt.add(serverModeLbl);
 
         serverRefreshBtn = new JButton() {
             @Override protected void paintComponent(Graphics g) {
@@ -923,6 +958,8 @@ public class LauncherGUI extends JFrame {
             serverStatusLbl.setText("Vérification...");
             serverStatusLbl.setForeground(TEXT_DIM);
             serverDot.setForeground(TEXT_DIM);
+            refreshPlayButtonLabel(null);
+            refreshServerLocalInfo();
             cachedServerOnline = null;
             serverRefreshBtn.setEnabled(false);
             new Thread(() -> {
@@ -964,6 +1001,42 @@ public class LauncherGUI extends JFrame {
             serverStatusLbl.setForeground(new Color(239, 68, 68));
         }
         serverDot.setToolTipText(isOnline ? "Connecté à " + SERVER_HOST : "Impossible de joindre " + SERVER_HOST);
+        refreshServerLocalInfo();
+        refreshPlayButtonLabel(isOnline);
+    }
+
+    private void refreshServerLocalInfo() {
+        if (serverModeLbl == null) return;
+
+        boolean localAvailable = resolveCurrentInstalledModpackDir() != null;
+        serverModeLbl.setText(localAvailable ? "Modpack local disponible" : "Modpack local indisponible");
+        serverModeLbl.setToolTipText(localAvailable
+            ? "Un modpack est détecté localement et peut être lancé hors ligne."
+            : "Aucun modpack local détecté sur cette machine.");
+    }
+
+    private void setReadyToPlayButtonState() {
+        if (playButton == null) return;
+        playButton.setBackground(ACCENT);
+        playButton.setEnabled(true);
+        refreshPlayButtonLabel(cachedServerOnline);
+    }
+
+    private void refreshPlayButtonLabel(Boolean serverOnline) {
+        if (playButton == null) return;
+
+        boolean localAvailable = resolveCurrentInstalledModpackDir() != null;
+        String currentText = playButton.getText();
+        if (currentText == null || (!currentText.startsWith("JOUER") && !currentText.startsWith("PLAY"))) return;
+
+        boolean offlineLocalLaunch = localAvailable && Boolean.FALSE.equals(serverOnline);
+        playButton.setText(offlineLocalLaunch ? "JOUER EN LOCAL" : "JOUER");
+        playButton.setPreferredSize(offlineLocalLaunch ? new Dimension(180, 40) : new Dimension(140, 40));
+        playButton.setToolTipText(offlineLocalLaunch
+            ? "Le serveur est hors ligne, lancement du modpack local."
+            : null);
+        playButton.revalidate();
+        playButton.repaint();
     }
 
     // ── Carte Auth Microsoft ─────────────────────────────────────
@@ -1222,6 +1295,539 @@ public class LauncherGUI extends JFrame {
         card.add(t);
         card.add(valueLabel);
         return card;
+    }
+
+    private record ModEntry(
+        String name,
+        String version,
+        String fileName,
+        String compatibility,
+        String compatibilityReason,
+        long sizeBytes,
+        long lastModifiedEpoch
+    ) {}
+
+    private static final class ModsTableModel extends AbstractTableModel {
+        private final String[] columns = {"Nom", "Version", "Compatibilité", "Fichier", "Taille", "Modifié"};
+        private final List<ModEntry> entries;
+
+        private ModsTableModel(List<ModEntry> entries) {
+            this.entries = entries;
+        }
+
+        @Override public int getRowCount() { return entries.size(); }
+        @Override public int getColumnCount() { return columns.length; }
+        @Override public String getColumnName(int column) { return columns[column]; }
+
+        @Override
+        public Object getValueAt(int rowIndex, int columnIndex) {
+            ModEntry e = entries.get(rowIndex);
+            return switch (columnIndex) {
+                case 0 -> e.name();
+                case 1 -> e.version();
+                case 2 -> e.compatibility();
+                case 3 -> e.fileName();
+                case 4 -> e.sizeBytes();
+                case 5 -> e.lastModifiedEpoch();
+                default -> "";
+            };
+        }
+
+        @Override
+        public Class<?> getColumnClass(int columnIndex) {
+            return switch (columnIndex) {
+                case 4, 5 -> Long.class;
+                default -> String.class;
+            };
+        }
+    }
+
+    private void attachModsCardActions(JPanel modsCard, JLabel modsValueLabel) {
+        if (modsCard == null) return;
+        modsCard.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        modsCard.setToolTipText("Ouvrir le catalogue des mods installés");
+        if (modsValueLabel != null) {
+            modsValueLabel.setCursor(new Cursor(Cursor.HAND_CURSOR));
+            modsValueLabel.setToolTipText("Ouvrir le catalogue des mods installés");
+        }
+
+        MouseAdapter openModsDialog = new MouseAdapter() {
+            @Override public void mouseClicked(MouseEvent e) { showModsCatalogDialog(); }
+        };
+        modsCard.addMouseListener(openModsDialog);
+        if (modsValueLabel != null) modsValueLabel.addMouseListener(openModsDialog);
+    }
+
+    private void showModsCatalogDialog() {
+        File gameDir = resolveCurrentInstalledModpackDir();
+        if (gameDir == null || !gameDir.isDirectory()) {
+            JOptionPane.showMessageDialog(
+                this,
+                "Aucun modpack local détecté. Installe ou mets à jour le modpack avant d'ouvrir cette vue.",
+                "Catalogue des mods",
+                JOptionPane.INFORMATION_MESSAGE
+            );
+            return;
+        }
+
+        File modsDir = new File(gameDir, "mods");
+        if (!modsDir.exists() || !modsDir.isDirectory()) {
+            JOptionPane.showMessageDialog(
+                this,
+                "Le dossier mods est introuvable dans :\n" + gameDir.getAbsolutePath(),
+                "Catalogue des mods",
+                JOptionPane.WARNING_MESSAGE
+            );
+            return;
+        }
+
+        List<ModEntry> entries = scanInstalledMods(modsDir);
+
+        JDialog dialog = new JDialog(this, "Mods installés — " + gameDir.getName(), false);
+        dialog.setSize(920, 560);
+        dialog.setLocationRelativeTo(this);
+
+        JPanel root = new JPanel(new BorderLayout(10, 10));
+        root.setBackground(BG);
+        root.setBorder(new EmptyBorder(12, 12, 12, 12));
+
+        JLabel title = new JLabel("Catalogue des mods");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        title.setForeground(TEXT);
+
+        JLabel subtitle = new JLabel("Modpack: " + gameDir.getName() + " — Dossier: " + modsDir.getAbsolutePath());
+        subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        subtitle.setForeground(TEXT_DIM);
+
+        JPanel header = new JPanel();
+        header.setOpaque(false);
+        header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
+        header.add(title);
+        header.add(Box.createVerticalStrut(2));
+        header.add(subtitle);
+
+        root.add(header, BorderLayout.NORTH);
+
+        ModsTableModel model = new ModsTableModel(entries);
+        JTable table = new JTable(model);
+        table.setRowHeight(28);
+        table.setAutoCreateRowSorter(false);
+        table.setFillsViewportHeight(true);
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        table.getTableHeader().setReorderingAllowed(false);
+        table.setForeground(TEXT);
+        table.setBackground(CARD_BG);
+        table.setGridColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 45));
+
+        DefaultTableCellRenderer sizeRenderer = new DefaultTableCellRenderer() {
+            @Override
+            protected void setValue(Object value) {
+                if (value instanceof Long n) setText(formatBytes(n));
+                else super.setValue(value);
+            }
+        };
+        table.getColumnModel().getColumn(4).setCellRenderer(sizeRenderer);
+
+        DateTimeFormatter tsFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        DefaultTableCellRenderer dateRenderer = new DefaultTableCellRenderer() {
+            @Override
+            protected void setValue(Object value) {
+                if (value instanceof Long epochMs) {
+                    setText(LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(epochMs), java.time.ZoneId.systemDefault()).format(tsFmt));
+                } else {
+                    super.setValue(value);
+                }
+            }
+        };
+        table.getColumnModel().getColumn(5).setCellRenderer(dateRenderer);
+
+        DefaultTableCellRenderer compatibilityRenderer = new DefaultTableCellRenderer() {
+            @Override
+            protected void setValue(Object value) {
+                String v = value == null ? "?" : value.toString();
+                setText(v);
+                if ("OK".equalsIgnoreCase(v)) {
+                    setForeground(new Color(16, 185, 129));
+                } else if ("A vérifier".equalsIgnoreCase(v)) {
+                    setForeground(new Color(245, 158, 11));
+                } else {
+                    setForeground(TEXT_DIM);
+                }
+            }
+        };
+        compatibilityRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+        table.getColumnModel().getColumn(2).setCellRenderer(compatibilityRenderer);
+
+        TableRowSorter<ModsTableModel> sorter = new TableRowSorter<>(model);
+        sorter.setComparator(0, String.CASE_INSENSITIVE_ORDER);
+        sorter.setComparator(1, String.CASE_INSENSITIVE_ORDER);
+        sorter.setComparator(2, String.CASE_INSENSITIVE_ORDER);
+        sorter.setComparator(3, String.CASE_INSENSITIVE_ORDER);
+        sorter.setComparator(4, Comparator.naturalOrder());
+        sorter.setComparator(5, Comparator.naturalOrder());
+        table.setRowSorter(sorter);
+
+        table.getColumnModel().getColumn(0).setPreferredWidth(230);
+        table.getColumnModel().getColumn(1).setPreferredWidth(140);
+        table.getColumnModel().getColumn(2).setPreferredWidth(120);
+        table.getColumnModel().getColumn(3).setPreferredWidth(260);
+        table.getColumnModel().getColumn(4).setPreferredWidth(90);
+        table.getColumnModel().getColumn(5).setPreferredWidth(140);
+
+        table.addMouseMotionListener(new MouseAdapter() {
+            @Override
+            public void mouseMoved(MouseEvent e) {
+                int viewRow = table.rowAtPoint(e.getPoint());
+                int viewCol = table.columnAtPoint(e.getPoint());
+                if (viewRow < 0 || viewCol != 2) {
+                    table.setToolTipText(null);
+                    return;
+                }
+                int modelRow = table.convertRowIndexToModel(viewRow);
+                ModEntry me = entries.get(modelRow);
+                table.setToolTipText(me.compatibilityReason());
+            }
+        });
+
+        JScrollPane scroll = new JScrollPane(table);
+        scroll.getViewport().setBackground(CARD_BG);
+        scroll.setBorder(BorderFactory.createLineBorder(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 60), 1));
+
+        JTextField searchField = new JTextField();
+        searchField.setColumns(24);
+        searchField.setToolTipText("Rechercher par nom, version ou fichier");
+
+        JComboBox<String> sortCombo = new JComboBox<>(new String[] {
+            "Nom (A → Z)",
+            "Nom (Z → A)",
+            "Version (A → Z)",
+            "Version (Z → A)",
+            "Taille (petit → grand)",
+            "Taille (grand → petit)",
+            "Date (récent → ancien)",
+            "Date (ancien → récent)"
+        });
+
+        JComboBox<String> compatibilityFilterCombo = new JComboBox<>(new String[] {
+            "Compatibilité: Toutes",
+            "Compatibilité: OK",
+            "Compatibilité: A vérifier"
+        });
+
+        Runnable applySearchAndSort = () -> {
+            List<RowFilter<ModsTableModel, Integer>> filters = new ArrayList<>();
+
+            String q = searchField.getText();
+            if (q != null && !q.isBlank()) {
+                String pattern = "(?i)" + Pattern.quote(q.trim());
+                filters.add(RowFilter.regexFilter(pattern, 0, 1, 2, 3));
+            }
+
+            int compatibilityFilter = compatibilityFilterCombo.getSelectedIndex();
+            if (compatibilityFilter == 1) {
+                filters.add(RowFilter.regexFilter("(?i)^OK$", 2));
+            } else if (compatibilityFilter == 2) {
+                filters.add(RowFilter.regexFilter("(?i)^A vérifier$", 2));
+            }
+
+            sorter.setRowFilter(filters.isEmpty() ? null : RowFilter.andFilter(filters));
+
+            int idx = sortCombo.getSelectedIndex();
+            List<RowSorter.SortKey> keys = new ArrayList<>();
+            switch (idx) {
+                case 1 -> keys.add(new RowSorter.SortKey(0, SortOrder.DESCENDING));
+                case 2 -> keys.add(new RowSorter.SortKey(1, SortOrder.ASCENDING));
+                case 3 -> keys.add(new RowSorter.SortKey(1, SortOrder.DESCENDING));
+                case 4 -> keys.add(new RowSorter.SortKey(4, SortOrder.ASCENDING));
+                case 5 -> keys.add(new RowSorter.SortKey(4, SortOrder.DESCENDING));
+                case 6 -> keys.add(new RowSorter.SortKey(5, SortOrder.DESCENDING));
+                case 7 -> keys.add(new RowSorter.SortKey(5, SortOrder.ASCENDING));
+                default -> keys.add(new RowSorter.SortKey(0, SortOrder.ASCENDING));
+            }
+            sorter.setSortKeys(keys);
+            sorter.sort();
+        };
+
+        searchField.getDocument().addDocumentListener(new DocumentListener() {
+            @Override public void insertUpdate(DocumentEvent e) { applySearchAndSort.run(); }
+            @Override public void removeUpdate(DocumentEvent e) { applySearchAndSort.run(); }
+            @Override public void changedUpdate(DocumentEvent e) { applySearchAndSort.run(); }
+        });
+        sortCombo.addActionListener(e -> applySearchAndSort.run());
+        compatibilityFilterCombo.addActionListener(e -> applySearchAndSort.run());
+
+        JLabel footerStats = new JLabel();
+        footerStats.setForeground(TEXT_DIM);
+        footerStats.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+
+        Runnable refreshStats = () -> footerStats.setText(
+            "Mods trouvés: " + sorter.getViewRowCount() + " / " + model.getRowCount()
+        );
+        sorter.addRowSorterListener(e -> refreshStats.run());
+
+        JButton refreshBtn = mkButton("Rafraîchir", CARD_BG, TEXT, 10, 30);
+        refreshBtn.addActionListener(e -> {
+            dialog.dispose();
+            showModsCatalogDialog();
+        });
+
+        JButton openFolderBtn = mkButton("Ouvrir dossier mods", CARD_BG, ACCENT, 10, 30);
+        openFolderBtn.addActionListener(e -> {
+            try {
+                Desktop.getDesktop().open(modsDir);
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(dialog,
+                    "Impossible d'ouvrir le dossier mods:\n" + ex.getMessage(),
+                    "Catalogue des mods",
+                    JOptionPane.WARNING_MESSAGE);
+            }
+        });
+
+        JButton copyBtn = mkButton("Copier la sélection", CARD_BG, TEXT, 10, 30);
+        copyBtn.addActionListener(e -> {
+            int viewRow = table.getSelectedRow();
+            if (viewRow < 0) {
+                Toolkit.getDefaultToolkit().beep();
+                return;
+            }
+            int modelRow = table.convertRowIndexToModel(viewRow);
+            ModEntry sel = entries.get(modelRow);
+            String payload = sel.name() + " | " + sel.version() + " | " + sel.fileName();
+            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(payload), null);
+        });
+
+        JButton exportCsvBtn = mkButton("Exporter CSV", CARD_BG, TEXT, 10, 30);
+        exportCsvBtn.addActionListener(e -> exportModsAsCsv(dialog, entries, gameDir.getName()));
+
+        JButton exportJsonBtn = mkButton("Exporter JSON", CARD_BG, TEXT, 10, 30);
+        exportJsonBtn.addActionListener(e -> exportModsAsJson(dialog, entries, gameDir.getName()));
+
+        JPanel tools = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        tools.setOpaque(false);
+        tools.add(new JLabel("Recherche:"));
+        tools.add(searchField);
+        tools.add(new JLabel("Filtre:"));
+        tools.add(compatibilityFilterCombo);
+        tools.add(new JLabel("Tri:"));
+        tools.add(sortCombo);
+        tools.add(refreshBtn);
+
+        JPanel content = new JPanel(new BorderLayout(0, 8));
+        content.setOpaque(false);
+        content.add(tools, BorderLayout.NORTH);
+        content.add(scroll, BorderLayout.CENTER);
+        root.add(content, BorderLayout.CENTER);
+
+        JPanel footer = new JPanel(new BorderLayout());
+        footer.setOpaque(false);
+
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        actions.setOpaque(false);
+        actions.add(exportCsvBtn);
+        actions.add(exportJsonBtn);
+        actions.add(openFolderBtn);
+        actions.add(copyBtn);
+
+        footer.add(footerStats, BorderLayout.WEST);
+        footer.add(actions, BorderLayout.EAST);
+        root.add(footer, BorderLayout.SOUTH);
+
+        dialog.setContentPane(root);
+        applySearchAndSort.run();
+        refreshStats.run();
+        dialog.setVisible(true);
+    }
+
+    private List<ModEntry> scanInstalledMods(File modsDir) {
+        List<ModEntry> entries = new ArrayList<>();
+        File[] jars = modsDir.listFiles((d, n) -> n.toLowerCase(Locale.ROOT).endsWith(".jar"));
+        if (jars == null || jars.length == 0) return entries;
+
+        Arrays.sort(jars, Comparator.comparing(File::getName, String.CASE_INSENSITIVE_ORDER));
+        for (File jar : jars) {
+            entries.add(readModEntry(jar));
+        }
+        return entries;
+    }
+
+    private ModEntry readModEntry(File jarFile) {
+        String fallbackName = stripJarSuffix(jarFile.getName());
+        String modName = fallbackName;
+        String modVersion = "inconnue";
+
+        try (JarFile jar = new JarFile(jarFile)) {
+            ZipEntry fabricMeta = jar.getEntry("fabric.mod.json");
+            if (fabricMeta != null) {
+                try (InputStream in = jar.getInputStream(fabricMeta)) {
+                    String raw = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+                    JSONObject json = new JSONObject(raw);
+                    String name = json.optString("name", "").trim();
+                    String id = json.optString("id", "").trim();
+                    String version = json.optString("version", "").trim();
+                    if (!name.isBlank()) modName = name;
+                    else if (!id.isBlank()) modName = id;
+                    if (!version.isBlank()) modVersion = version;
+                }
+            }
+
+            if ("inconnue".equals(modVersion)) {
+                Manifest mf = jar.getManifest();
+                if (mf != null) {
+                    Attributes at = mf.getMainAttributes();
+                    String mTitle = pickFirstNonBlank(
+                        at.getValue("Implementation-Title"),
+                        at.getValue("Specification-Title"),
+                        at.getValue("Bundle-Name")
+                    );
+                    String mVersion = pickFirstNonBlank(
+                        at.getValue("Implementation-Version"),
+                        at.getValue("Specification-Version"),
+                        at.getValue("Bundle-Version")
+                    );
+                    if (mTitle != null) modName = mTitle;
+                    if (mVersion != null) modVersion = mVersion;
+                }
+            }
+        } catch (Exception ignored) {}
+
+        if ("inconnue".equals(modVersion)) {
+            String guessed = guessVersionFromFileName(jarFile.getName());
+            if (guessed != null) modVersion = guessed;
+        }
+
+        String compatibility = "OK";
+        String compatibilityReason = "Aucun indice d'incompatibilité détecté.";
+        String lowerFile = jarFile.getName().toLowerCase(Locale.ROOT);
+        if (lowerFile.contains("forge") || lowerFile.contains("neoforge") || lowerFile.contains("quilt")) {
+            compatibility = "A vérifier";
+            compatibilityReason = "Nom du fichier suggère une variante Forge/NeoForge/Quilt.";
+        }
+
+        return new ModEntry(
+            modName,
+            modVersion,
+            jarFile.getName(),
+            compatibility,
+            compatibilityReason,
+            jarFile.length(),
+            jarFile.lastModified()
+        );
+    }
+
+    private void exportModsAsCsv(Component parent, List<ModEntry> entries, String baseName) {
+        Path out = chooseModsExportTarget(parent, baseName, "csv", "Fichier CSV (*.csv)", "csv");
+        if (out == null) return;
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("name,version,compatibility,compatibility_reason,file,size_bytes,last_modified_epoch\n");
+        for (ModEntry e : entries) {
+            sb.append(csv(e.name())).append(',')
+              .append(csv(e.version())).append(',')
+              .append(csv(e.compatibility())).append(',')
+              .append(csv(e.compatibilityReason())).append(',')
+              .append(csv(e.fileName())).append(',')
+              .append(e.sizeBytes()).append(',')
+              .append(e.lastModifiedEpoch()).append('\n');
+        }
+
+        try {
+            Files.writeString(out, sb.toString(), StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            JOptionPane.showMessageDialog(parent, "Export CSV terminé:\n" + out, "Catalogue des mods", JOptionPane.INFORMATION_MESSAGE);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(parent, "Erreur export CSV:\n" + ex.getMessage(), "Catalogue des mods", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void exportModsAsJson(Component parent, List<ModEntry> entries, String baseName) {
+        Path out = chooseModsExportTarget(parent, baseName, "json", "Fichier JSON (*.json)", "json");
+        if (out == null) return;
+
+        JSONArray arr = new JSONArray();
+        for (ModEntry e : entries) {
+            JSONObject row = new JSONObject();
+            row.put("name", e.name());
+            row.put("version", e.version());
+            row.put("compatibility", e.compatibility());
+            row.put("compatibilityReason", e.compatibilityReason());
+            row.put("file", e.fileName());
+            row.put("sizeBytes", e.sizeBytes());
+            row.put("lastModifiedEpoch", e.lastModifiedEpoch());
+            arr.put(row);
+        }
+
+        JSONObject root = new JSONObject();
+        root.put("generatedAt", LocalDateTime.now().toString());
+        root.put("mods", arr);
+
+        try {
+            Files.writeString(out, root.toString(2), StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            JOptionPane.showMessageDialog(parent, "Export JSON terminé:\n" + out, "Catalogue des mods", JOptionPane.INFORMATION_MESSAGE);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(parent, "Erreur export JSON:\n" + ex.getMessage(), "Catalogue des mods", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private Path chooseModsExportTarget(Component parent, String baseName, String ext, String filterLabel, String filterExt) {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Exporter le catalogue des mods");
+        chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(filterLabel, filterExt));
+
+        String safeBase = (baseName == null || baseName.isBlank()) ? "mods-catalog" : baseName;
+        safeBase = safeBase.replaceAll("[^A-Za-z0-9._-]", "_");
+        String defaultName = "mods-" + safeBase + "-" + LOG_FILE_TS.format(LocalDateTime.now()) + "." + ext;
+        chooser.setSelectedFile(new File(defaultName));
+
+        int result = chooser.showSaveDialog(parent);
+        if (result != JFileChooser.APPROVE_OPTION) return null;
+
+        File selected = chooser.getSelectedFile();
+        String p = selected.getAbsolutePath();
+        if (!p.toLowerCase(Locale.ROOT).endsWith("." + ext)) {
+            selected = new File(p + "." + ext);
+        }
+        return Paths.get(selected.getAbsolutePath());
+    }
+
+    private String csv(String value) {
+        String raw = value == null ? "" : value;
+        String escaped = raw.replace("\"", "\"\"");
+        return '"' + escaped + '"';
+    }
+
+    private String pickFirstNonBlank(String... values) {
+        if (values == null) return null;
+        for (String value : values) {
+            if (value != null && !value.isBlank()) return value.trim();
+        }
+        return null;
+    }
+
+    private String stripJarSuffix(String fileName) {
+        if (fileName == null) return "mod-inconnu";
+        return fileName.toLowerCase(Locale.ROOT).endsWith(".jar")
+            ? fileName.substring(0, fileName.length() - 4)
+            : fileName;
+    }
+
+    private String guessVersionFromFileName(String fileName) {
+        if (fileName == null) return null;
+        String clean = stripJarSuffix(fileName);
+        int sep = Math.max(clean.lastIndexOf('-'), clean.lastIndexOf('_'));
+        if (sep <= 0 || sep >= clean.length() - 1) return null;
+        String candidate = clean.substring(sep + 1);
+        if (candidate.matches("[0-9][0-9A-Za-z._+-]*")) return candidate;
+        return null;
+    }
+
+    private String formatBytes(long sizeBytes) {
+        if (sizeBytes < 1024) return sizeBytes + " B";
+        double kb = sizeBytes / 1024.0;
+        if (kb < 1024) return String.format(Locale.ROOT, "%.1f KB", kb);
+        double mb = kb / 1024.0;
+        if (mb < 1024) return String.format(Locale.ROOT, "%.1f MB", mb);
+        double gb = mb / 1024.0;
+        return String.format(Locale.ROOT, "%.2f GB", gb);
     }
 
     private JPanel versionCapsuleContainer;
@@ -1576,12 +2182,12 @@ public class LauncherGUI extends JFrame {
                         g2.fillRoundRect(0, 0, getWidth(), getHeight(), 15, 15);
                     }
                     g2.setPaint(new GradientPaint(0, 0, ACCENT.brighter(), 0, getHeight(), ACCENT));
-                    g2.fillRoundRect(hovered?1:2, hovered?1:2, getWidth()-(hovered?2:4), getHeight()-(hovered?2:4), 14, 14);
+                    g2.fillRoundRect(hovered ? 1 : 2, hovered ? 1 : 2, getWidth() - (hovered ? 2 : 4), getHeight() - (hovered ? 2 : 4), 14, 14);
                     g2.setColor(new Color(255, 255, 255, hovered ? 50 : 25));
-                    g2.fillRoundRect(4, 3, getWidth()-8, (getHeight()-6)/2, 10, 10);
+                    g2.fillRoundRect(4, 3, getWidth() - 8, (getHeight() - 6) / 2, 10, 10);
                 } else {
                     g2.setColor(new Color(100, 100, 110, 150));
-                    g2.fillRoundRect(2, 2, getWidth()-4, getHeight()-4, 14, 14);
+                    g2.fillRoundRect(2, 2, getWidth() - 4, getHeight() - 4, 14, 14);
                 }
                 g2.dispose();
                 super.paintComponent(g);
@@ -1600,6 +2206,9 @@ public class LauncherGUI extends JFrame {
         rightZone.add(settingsBtn);
         rightZone.add(logsBtn);
         rightZone.add(playButton);
+
+        refreshServerLocalInfo();
+        refreshPlayButtonLabel(cachedServerOnline);
 
         bottomPanel.add(leftZone, BorderLayout.WEST);
         bottomPanel.add(rightZone, BorderLayout.EAST);
@@ -1751,6 +2360,8 @@ public class LauncherGUI extends JFrame {
     private void checkAndUpdate() {
         if (cachedServerOnline == null) {
             new Thread(this::checkServerOnce).start();
+        } else {
+            SwingUtilities.invokeLater(this::refreshServerLocalInfo);
         }
         try {
             appendLog("Initialisation du client Zokkymon — édition opérateur...");
@@ -1798,8 +2409,7 @@ public class LauncherGUI extends JFrame {
                     setStatus("Prêt à jouer");
                     appendLog("[OK] Modpack à jour — cliquez sur JOUER !");
                     playButton.setText("JOUER");
-                    playButton.setBackground(ACCENT);
-                    playButton.setEnabled(true);
+                    setReadyToPlayButtonState();
                 }
             });
         } catch (Exception e) {
@@ -1829,8 +2439,8 @@ public class LauncherGUI extends JFrame {
                 appendLog("[OK] Installation terminée !");
                 SwingUtilities.invokeLater(() -> {
                     playButton.setText("JOUER");
-                    playButton.setBackground(ACCENT);
-                    playButton.setEnabled(true);
+                    setReadyToPlayButtonState();
+                    refreshServerLocalInfo();
                 });
                 new Thread(this::initInfoCards).start();
             } catch (Exception e) {
@@ -1875,8 +2485,8 @@ public class LauncherGUI extends JFrame {
                 appendLog("[OK] Mise à jour terminée !");
                 SwingUtilities.invokeLater(() -> {
                     playButton.setText("JOUER");
-                    playButton.setBackground(ACCENT);
-                    playButton.setEnabled(true);
+                    setReadyToPlayButtonState();
+                    refreshServerLocalInfo();
                 });
                 new Thread(this::initInfoCards).start();
             } catch (Exception e) {
@@ -2338,7 +2948,8 @@ public class LauncherGUI extends JFrame {
                 appendLog("[OK] Réparation terminée avec succès.");
                 SwingUtilities.invokeLater(() -> {
                     playButton.setText("JOUER");
-                    playButton.setBackground(ACCENT);
+                    setReadyToPlayButtonState();
+                    refreshServerLocalInfo();
                 });
             } catch (Exception e) {
                 setStatus("Erreur de réparation");
@@ -2690,15 +3301,14 @@ public class LauncherGUI extends JFrame {
                     appendLog("[Offline] Pas de compte Microsoft — lancement en mode offline.");
                 }
 
-                File base = new File(config.getInstallPath());
-                File[] dirs = base.listFiles(d -> d.isDirectory() && d.getName().startsWith("zokkymon_v"));
-                if (dirs == null || dirs.length == 0) {
+                File gameDir = resolveCurrentInstalledModpackDir();
+                if (gameDir == null) {
                     setStatus("Modpack introuvable");
                     appendLog("[ERR] Dossier modpack non trouvé dans " + config.getInstallPath());
                     SwingUtilities.invokeLater(() -> playButton.setEnabled(true));
                     return;
                 }
-                File gameDir = dirs[dirs.length-1];
+
                 appendLog(">> Modpack : " + gameDir.getName());
 
                 runModsSanityScan(gameDir);
