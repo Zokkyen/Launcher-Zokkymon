@@ -2992,6 +2992,38 @@ public class LauncherGUI extends JFrame {
         }
     }
 
+    private String getPresetRamAllocation(String profile) {
+        String p = profile == null ? "performance" : profile;
+        return switch (p) {
+            case "quality" -> "10 Go";
+            case "low-end" -> "4 Go";
+            default -> "8 Go";
+        };
+    }
+
+    private String getPresetJvmArgs(String profile) {
+        String p = profile == null ? "performance" : profile;
+        return switch (p) {
+            case "quality" -> "-XX:MaxGCPauseMillis=180";
+            case "low-end" -> "-XX:MaxGCPauseMillis=250 -XX:G1HeapRegionSize=4M";
+            default -> "-XX:MaxGCPauseMillis=150";
+        };
+    }
+
+    private boolean isPresetFullscreen(String profile) {
+        String p = profile == null ? "performance" : profile;
+        return "quality".equals(p);
+    }
+
+    private Dimension getPresetResolution(String profile) {
+        String p = profile == null ? "performance" : profile;
+        return switch (p) {
+            case "quality" -> new Dimension(1920, 1080);
+            case "low-end" -> new Dimension(1280, 720);
+            default -> new Dimension(1600, 900);
+        };
+    }
+
     private void launchGame() {
         if (!config.hasMsaProfile()) {
             showPlayModeDialog();
@@ -3723,10 +3755,41 @@ public class LauncherGUI extends JFrame {
         if (result[0] == JOptionPane.OK_OPTION) {
             String selectedProfileLabel = (String) cProfile.getSelectedItem();
             String selectedProfile = toProfileKey(selectedProfileLabel);
+            String selectedRam = (String) cRam.getSelectedItem();
+            String selectedJvmArgs = fJvmArgs.getText() == null ? "" : fJvmArgs.getText().trim();
+            String selectedResolution = (String) cRes.getSelectedItem();
+
+            if (!"custom".equals(selectedProfile)) {
+                boolean presetMismatch = false;
+
+                if (selectedRam != null && !selectedRam.equals(getPresetRamAllocation(selectedProfile))) {
+                    presetMismatch = true;
+                }
+                if (!selectedJvmArgs.equals(getPresetJvmArgs(selectedProfile))) {
+                    presetMismatch = true;
+                }
+                if (isPresetFullscreen(selectedProfile)) {
+                    if (!"Plein écran".equals(selectedResolution)) {
+                        presetMismatch = true;
+                    }
+                } else {
+                    Dimension presetResolution = getPresetResolution(selectedProfile);
+                    String presetResolutionLabel = presetResolution.width + " × " + presetResolution.height;
+                    if (!presetResolutionLabel.equals(selectedResolution)) {
+                        presetMismatch = true;
+                    }
+                }
+
+                if (presetMismatch) {
+                    selectedProfile = "custom";
+                    appendLog("[Profil] Paramètres manuels détectés, bascule automatique en mode Personnalisé.");
+                }
+            }
+
             config.setLaunchProfile(selectedProfile);
 
             if ("custom".equals(selectedProfile)) {
-                config.setRamAllocation((String) cRam.getSelectedItem());
+                config.setRamAllocation(selectedRam);
                 config.setCustomJvmArgs(fJvmArgs.getText());
                 appendLog("[Profil] Mode personnalisé enregistré.");
             } else {
