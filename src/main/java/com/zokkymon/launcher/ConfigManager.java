@@ -379,8 +379,10 @@ public class ConfigManager {
             userConfig.put("msaRefreshToken", SecureStorage.encrypt(p.refreshToken));
         } catch (Exception e) {
             System.err.println("[WARN] Impossible de chiffrer les tokens MSA : " + e.getMessage());
-            userConfig.put("msaAccessToken",  p.accessToken);
-            userConfig.put("msaRefreshToken", p.refreshToken);
+            // Sécurité: ne jamais persister les tokens en clair.
+            userConfig.remove("msaAccessToken");
+            userConfig.remove("msaRefreshToken");
+            userConfig.put("msaExpiresAt", 0L);
         }
         saveConfig();
     }

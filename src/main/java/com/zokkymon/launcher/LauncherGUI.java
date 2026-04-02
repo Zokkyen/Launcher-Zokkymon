@@ -1303,12 +1303,13 @@ public class LauncherGUI extends JFrame {
         String fileName,
         String compatibility,
         String compatibilityReason,
+        String environment,
         long sizeBytes,
         long lastModifiedEpoch
     ) {}
 
     private static final class ModsTableModel extends AbstractTableModel {
-        private final String[] columns = {"Nom", "Version", "Compatibilité", "Fichier", "Taille", "Modifié"};
+        private final String[] columns = {"Nom", "Version", "Compatibilité", "Environnement", "Fichier", "Taille", "Modifié"};
         private final List<ModEntry> entries;
 
         private ModsTableModel(List<ModEntry> entries) {
@@ -1326,9 +1327,10 @@ public class LauncherGUI extends JFrame {
                 case 0 -> e.name();
                 case 1 -> e.version();
                 case 2 -> e.compatibility();
-                case 3 -> e.fileName();
-                case 4 -> e.sizeBytes();
-                case 5 -> e.lastModifiedEpoch();
+                case 3 -> e.environment();
+                case 4 -> e.fileName();
+                case 5 -> e.sizeBytes();
+                case 6 -> e.lastModifiedEpoch();
                 default -> "";
             };
         }
@@ -1336,7 +1338,7 @@ public class LauncherGUI extends JFrame {
         @Override
         public Class<?> getColumnClass(int columnIndex) {
             return switch (columnIndex) {
-                case 4, 5 -> Long.class;
+                case 5, 6 -> Long.class;
                 default -> String.class;
             };
         }
@@ -1384,7 +1386,7 @@ public class LauncherGUI extends JFrame {
         List<ModEntry> entries = scanInstalledMods(modsDir);
 
         JDialog dialog = new JDialog(this, "Mods installés — " + gameDir.getName(), false);
-        dialog.setSize(920, 560);
+        dialog.setSize(1020, 560);
         dialog.setLocationRelativeTo(this);
 
         JPanel root = new JPanel(new BorderLayout(10, 10));
@@ -1426,7 +1428,7 @@ public class LauncherGUI extends JFrame {
                 else super.setValue(value);
             }
         };
-        table.getColumnModel().getColumn(4).setCellRenderer(sizeRenderer);
+        table.getColumnModel().getColumn(5).setCellRenderer(sizeRenderer);
 
         DateTimeFormatter tsFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
         DefaultTableCellRenderer dateRenderer = new DefaultTableCellRenderer() {
@@ -1439,7 +1441,7 @@ public class LauncherGUI extends JFrame {
                 }
             }
         };
-        table.getColumnModel().getColumn(5).setCellRenderer(dateRenderer);
+        table.getColumnModel().getColumn(6).setCellRenderer(dateRenderer);
 
         DefaultTableCellRenderer compatibilityRenderer = new DefaultTableCellRenderer() {
             @Override
@@ -1458,21 +1460,40 @@ public class LauncherGUI extends JFrame {
         compatibilityRenderer.setHorizontalAlignment(SwingConstants.CENTER);
         table.getColumnModel().getColumn(2).setCellRenderer(compatibilityRenderer);
 
+        DefaultTableCellRenderer environmentRenderer = new DefaultTableCellRenderer() {
+            @Override
+            protected void setValue(Object value) {
+                String v = value == null ? "Client/Serveur" : value.toString();
+                setText(v);
+                if ("Client".equalsIgnoreCase(v)) {
+                    setForeground(new Color(96, 165, 250));
+                } else if ("Serveur".equalsIgnoreCase(v)) {
+                    setForeground(new Color(251, 146, 60));
+                } else {
+                    setForeground(new Color(16, 185, 129));
+                }
+            }
+        };
+        environmentRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+        table.getColumnModel().getColumn(3).setCellRenderer(environmentRenderer);
+
         TableRowSorter<ModsTableModel> sorter = new TableRowSorter<>(model);
         sorter.setComparator(0, String.CASE_INSENSITIVE_ORDER);
         sorter.setComparator(1, String.CASE_INSENSITIVE_ORDER);
         sorter.setComparator(2, String.CASE_INSENSITIVE_ORDER);
         sorter.setComparator(3, String.CASE_INSENSITIVE_ORDER);
-        sorter.setComparator(4, Comparator.naturalOrder());
+        sorter.setComparator(4, String.CASE_INSENSITIVE_ORDER);
         sorter.setComparator(5, Comparator.naturalOrder());
+        sorter.setComparator(6, Comparator.naturalOrder());
         table.setRowSorter(sorter);
 
-        table.getColumnModel().getColumn(0).setPreferredWidth(230);
-        table.getColumnModel().getColumn(1).setPreferredWidth(140);
-        table.getColumnModel().getColumn(2).setPreferredWidth(120);
-        table.getColumnModel().getColumn(3).setPreferredWidth(260);
-        table.getColumnModel().getColumn(4).setPreferredWidth(90);
-        table.getColumnModel().getColumn(5).setPreferredWidth(140);
+        table.getColumnModel().getColumn(0).setPreferredWidth(210);
+        table.getColumnModel().getColumn(1).setPreferredWidth(120);
+        table.getColumnModel().getColumn(2).setPreferredWidth(110);
+        table.getColumnModel().getColumn(3).setPreferredWidth(110);
+        table.getColumnModel().getColumn(4).setPreferredWidth(240);
+        table.getColumnModel().getColumn(5).setPreferredWidth(80);
+        table.getColumnModel().getColumn(6).setPreferredWidth(130);
 
         table.addMouseMotionListener(new MouseAdapter() {
             @Override
@@ -1514,13 +1535,20 @@ public class LauncherGUI extends JFrame {
             "Compatibilité: A vérifier"
         });
 
+        JComboBox<String> environmentFilterCombo = new JComboBox<>(new String[] {
+            "Environnement: Tous",
+            "Environnement: Client",
+            "Environnement: Serveur",
+            "Environnement: Client/Serveur"
+        });
+
         Runnable applySearchAndSort = () -> {
             List<RowFilter<ModsTableModel, Integer>> filters = new ArrayList<>();
 
             String q = searchField.getText();
             if (q != null && !q.isBlank()) {
                 String pattern = "(?i)" + Pattern.quote(q.trim());
-                filters.add(RowFilter.regexFilter(pattern, 0, 1, 2, 3));
+                filters.add(RowFilter.regexFilter(pattern, 0, 1, 2, 3, 4));
             }
 
             int compatibilityFilter = compatibilityFilterCombo.getSelectedIndex();
@@ -1528,6 +1556,15 @@ public class LauncherGUI extends JFrame {
                 filters.add(RowFilter.regexFilter("(?i)^OK$", 2));
             } else if (compatibilityFilter == 2) {
                 filters.add(RowFilter.regexFilter("(?i)^A vérifier$", 2));
+            }
+
+            int envFilter = environmentFilterCombo.getSelectedIndex();
+            if (envFilter == 1) {
+                filters.add(RowFilter.regexFilter("^Client$", 3));
+            } else if (envFilter == 2) {
+                filters.add(RowFilter.regexFilter("^Serveur$", 3));
+            } else if (envFilter == 3) {
+                filters.add(RowFilter.regexFilter("^Client/Serveur$", 3));
             }
 
             sorter.setRowFilter(filters.isEmpty() ? null : RowFilter.andFilter(filters));
@@ -1538,10 +1575,10 @@ public class LauncherGUI extends JFrame {
                 case 1 -> keys.add(new RowSorter.SortKey(0, SortOrder.DESCENDING));
                 case 2 -> keys.add(new RowSorter.SortKey(1, SortOrder.ASCENDING));
                 case 3 -> keys.add(new RowSorter.SortKey(1, SortOrder.DESCENDING));
-                case 4 -> keys.add(new RowSorter.SortKey(4, SortOrder.ASCENDING));
-                case 5 -> keys.add(new RowSorter.SortKey(4, SortOrder.DESCENDING));
-                case 6 -> keys.add(new RowSorter.SortKey(5, SortOrder.DESCENDING));
-                case 7 -> keys.add(new RowSorter.SortKey(5, SortOrder.ASCENDING));
+                case 4 -> keys.add(new RowSorter.SortKey(5, SortOrder.ASCENDING));
+                case 5 -> keys.add(new RowSorter.SortKey(5, SortOrder.DESCENDING));
+                case 6 -> keys.add(new RowSorter.SortKey(6, SortOrder.DESCENDING));
+                case 7 -> keys.add(new RowSorter.SortKey(6, SortOrder.ASCENDING));
                 default -> keys.add(new RowSorter.SortKey(0, SortOrder.ASCENDING));
             }
             sorter.setSortKeys(keys);
@@ -1555,6 +1592,7 @@ public class LauncherGUI extends JFrame {
         });
         sortCombo.addActionListener(e -> applySearchAndSort.run());
         compatibilityFilterCombo.addActionListener(e -> applySearchAndSort.run());
+        environmentFilterCombo.addActionListener(e -> applySearchAndSort.run());
 
         JLabel footerStats = new JLabel();
         footerStats.setForeground(TEXT_DIM);
@@ -1592,7 +1630,7 @@ public class LauncherGUI extends JFrame {
             }
             int modelRow = table.convertRowIndexToModel(viewRow);
             ModEntry sel = entries.get(modelRow);
-            String payload = sel.name() + " | " + sel.version() + " | " + sel.fileName();
+            String payload = sel.name() + " | " + sel.version() + " | " + sel.environment() + " | " + sel.fileName();
             Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(payload), null);
         });
 
@@ -1608,6 +1646,7 @@ public class LauncherGUI extends JFrame {
         tools.add(searchField);
         tools.add(new JLabel("Filtre:"));
         tools.add(compatibilityFilterCombo);
+        tools.add(environmentFilterCombo);
         tools.add(new JLabel("Tri:"));
         tools.add(sortCombo);
         tools.add(refreshBtn);
@@ -1654,6 +1693,7 @@ public class LauncherGUI extends JFrame {
         String fallbackName = stripJarSuffix(jarFile.getName());
         String modName = fallbackName;
         String modVersion = "inconnue";
+        String modEnvironment = "Client/Serveur";
 
         try (JarFile jar = new JarFile(jarFile)) {
             ZipEntry fabricMeta = jar.getEntry("fabric.mod.json");
@@ -1667,6 +1707,12 @@ public class LauncherGUI extends JFrame {
                     if (!name.isBlank()) modName = name;
                     else if (!id.isBlank()) modName = id;
                     if (!version.isBlank()) modVersion = version;
+                    String env = json.optString("environment", "*").trim().toLowerCase(Locale.ROOT);
+                    modEnvironment = switch (env) {
+                        case "client" -> "Client";
+                        case "server" -> "Serveur";
+                        default -> "Client/Serveur";
+                    };
                 }
             }
 
@@ -1709,6 +1755,7 @@ public class LauncherGUI extends JFrame {
             jarFile.getName(),
             compatibility,
             compatibilityReason,
+            modEnvironment,
             jarFile.length(),
             jarFile.lastModified()
         );
@@ -1719,12 +1766,13 @@ public class LauncherGUI extends JFrame {
         if (out == null) return;
 
         StringBuilder sb = new StringBuilder();
-        sb.append("name,version,compatibility,compatibility_reason,file,size_bytes,last_modified_epoch\n");
+        sb.append("name,version,compatibility,compatibility_reason,environment,file,size_bytes,last_modified_epoch\n");
         for (ModEntry e : entries) {
             sb.append(csv(e.name())).append(',')
               .append(csv(e.version())).append(',')
               .append(csv(e.compatibility())).append(',')
               .append(csv(e.compatibilityReason())).append(',')
+              .append(csv(e.environment())).append(',')
               .append(csv(e.fileName())).append(',')
               .append(e.sizeBytes()).append(',')
               .append(e.lastModifiedEpoch()).append('\n');
@@ -1749,6 +1797,7 @@ public class LauncherGUI extends JFrame {
             row.put("version", e.version());
             row.put("compatibility", e.compatibility());
             row.put("compatibilityReason", e.compatibilityReason());
+            row.put("environment", e.environment());
             row.put("file", e.fileName());
             row.put("sizeBytes", e.sizeBytes());
             row.put("lastModifiedEpoch", e.lastModifiedEpoch());

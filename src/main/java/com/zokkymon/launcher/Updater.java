@@ -43,10 +43,7 @@ public class Updater {
     }
 
     private void downloadFile(String urlStr, File dest, String fileName, int lo, int hi) throws IOException {
-        URL url = URI.create(urlStr).toURL();
-        URLConnection connection = url.openConnection();
-        connection.setConnectTimeout(10000);
-        connection.setReadTimeout(10000);
+        URLConnection connection = openSecureConnection(urlStr, 10000, 10000);
 
         // Récupérer la taille du fichier
         long contentLength = connection.getContentLengthLong();
@@ -80,10 +77,7 @@ public class Updater {
     }
 
     private String readUrl(String urlStr) throws IOException {
-        URL url = URI.create(urlStr).toURL();
-        URLConnection connection = url.openConnection();
-        connection.setConnectTimeout(10000);
-        connection.setReadTimeout(10000);
+        URLConnection connection = openSecureConnection(urlStr, 10000, 10000);
         
         // Vérifier le code HTTP si c'est une connexion HTTP/HTTPS
         if (connection instanceof HttpURLConnection) {
@@ -101,6 +95,27 @@ public class Updater {
             String line;
             while ((line = br.readLine()) != null) sb.append(line);
             return sb.toString();
+        }
+    }
+
+    private URLConnection openSecureConnection(String urlStr, int connectTimeout, int readTimeout) throws IOException {
+        try {
+            URI uri = URI.create(urlStr);
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+
+            boolean loopbackHost = "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host);
+            if (!loopbackHost && (scheme == null || !"https".equalsIgnoreCase(scheme))) {
+                throw new IOException("URL non sécurisée (HTTPS requis): " + urlStr);
+            }
+
+            URLConnection connection = uri.toURL().openConnection();
+            connection.setConnectTimeout(connectTimeout);
+            connection.setReadTimeout(readTimeout);
+            connection.setRequestProperty("User-Agent", "ZokkymonLauncher/1.0");
+            return connection;
+        } catch (IllegalArgumentException e) {
+            throw new IOException("URL invalide: " + urlStr, e);
         }
     }
 
