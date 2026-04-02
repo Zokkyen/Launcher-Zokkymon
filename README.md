@@ -21,7 +21,11 @@ Les releases stables sont publiees sur main.
 - Catalogue des mods integre (liste des jars installes avec nom/version/fichier/taille/date)
 - Recherche en direct et tri des mods (nom, version, taille, date)
 - Filtre de compatibilite mods (Toutes / OK / A verifier)
-- Export du catalogue des mods en CSV et JSON
+- Colonne Environnement dans le catalogue mods (Client / Serveur / Client/Serveur) + filtre dedie
+- Export du catalogue des mods en CSV et JSON (incluant environment)
+- Profils de lancement (performance/quality/low-end/custom) avec bascule auto vers custom si reglages manuels RAM/JVM
+- Re-injection automatique des mods launcher manquants meme si le cache d injection est inchange
+- Updater durci: connexions reseau HTTPS requises (sauf loopback local)
 - UI Swing personnalisee + themes clair/sombre
 - Stockage chiffre des tokens MSA (AES-256-GCM)
 
@@ -92,7 +96,9 @@ commit.
 ## Securite et verification binaire
 
 - Les tokens MSA sont stockes chiffres sur disque via SecureStorage.
+- En cas d echec du chiffrement local, les tokens MSA ne sont pas persistes en clair.
 - Les artefacts modpack sont verifies par SHA-256.
+- Les connexions de l updater imposent HTTPS (sauf localhost/127.0.0.1).
 - En beta, l EXE genere est scanne automatiquement via VirusTotal pendant le workflow.
 - Les rapports sont publies dans security-reports/
   (notamment virustotal-beta-latest.md).
