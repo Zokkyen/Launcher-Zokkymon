@@ -86,6 +86,8 @@ public class LauncherGUI extends JFrame {
     private JLabel       statusLabel;
     private JProgressBar progressBar;
     private JButton      playButton;
+    private JDialog      settingsDialog;
+    private JDialog      logsDialog;
 
     // ── Info-cards ───────────────────────────────────────────────────────────
     private JLabel infoModpackVal;
@@ -129,13 +131,18 @@ public class LauncherGUI extends JFrame {
     private static final int LOG_RETENTION_DAYS = 30;
     private static final int MAX_SESSION_LOG_FILES = 120;
     private static final long FULL_LOG_ROTATE_BYTES = 25L * 1024L * 1024L;
+    private static final int MAX_UI_LOG_CHARS = 500_000;
+    private static final int UI_LOG_TRIM_CHARS = 120_000;
 
     // ── Logs persistants ──────────────────────────────────────────────────────
     private final Object logFileLock = new Object();
+    private final Object uiLogLock = new Object();
     private File logsDirectory;
     private File sessionLogFile;
     private File fullLogFile;
     private BlockingQueue<String> pendingLogLines;
+    private final List<String> pendingUiLogLines = new ArrayList<>();
+    private boolean uiLogFlushScheduled = false;
 
     // ── Cache images ──────────────────────────────────────────────────────────
     private transient BufferedImage bannerImg;
@@ -507,11 +514,35 @@ public class LauncherGUI extends JFrame {
         try {
             String raw = config.getRamAllocation();
             String numeric = raw.replaceAll("[^0-9]", "");
-            if (numeric.isBlank()) return 6;
-            return Integer.parseInt(numeric);
+            if (numeric.isBlank()) return 4;
+            return Math.max(4, Integer.parseInt(numeric));
         } catch (Exception ignored) {
-            return 6;
+            return 4;
         }
+    }
+
+    private int detectTotalSystemRamGb() {
+        try {
+            com.sun.management.OperatingSystemMXBean os =
+                (com.sun.management.OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
+            return Math.max(4, (int) Math.round(os.getTotalMemorySize() / 1_073_741_824.0));
+        } catch (Exception ignored) {
+            return 8;
+        }
+    }
+
+    private int detectRecommendedMaxRamGb() {
+        return Math.max(4, detectTotalSystemRamGb() - 4);
+    }
+
+    private String[] buildRamChoices() {
+        int max = detectRecommendedMaxRamGb();
+        List<String> values = new ArrayList<>();
+        for (int gb = 4; gb <= max; gb += 2) {
+            values.add(gb + " Go");
+        }
+        if (values.isEmpty()) values.add("4 Go");
+        return values.toArray(new String[0]);
     }
 
     private boolean runPreLaunchHealthCheck() {
@@ -2271,7 +2302,21 @@ public class LauncherGUI extends JFrame {
 
     // ── Boîte de dialogue des Logs ───────────────────────────────────────────
     private void showLogsDialog() {
-        JDialog dialog = new JDialog(this, "Zokkymon • Console d'exploitation", false);
+        if (logsDialog != null && logsDialog.isShowing()) {
+            logsDialog.toFront();
+            logsDialog.requestFocus();
+            return;
+        }
+
+        logsDialog = new JDialog(this, "Zokkymon • Console d'exploitation", false);
+        JDialog dialog = logsDialog;
+        dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        dialog.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosed(java.awt.event.WindowEvent e) {
+                logsDialog = null;
+            }
+        });
         dialog.setSize(750, 450);
         dialog.setLocationRelativeTo(this);
         
@@ -2342,7 +2387,7 @@ public class LauncherGUI extends JFrame {
             com.sun.management.OperatingSystemMXBean os =
                 (com.sun.management.OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
             long totalGb = Math.round(os.getTotalMemorySize() / 1_073_741_824.0);
-            rs = config.getRamAllocation() + " / " + totalGb + " Go";
+            rs = config.getRamAllocation() + " / " + totalGb + " Go (système)";
         } catch (Exception ignored) {
             rs = config.getRamAllocation();
         }
@@ -3420,6 +3465,12 @@ public class LauncherGUI extends JFrame {
     }
 
     private void openSettings() {
+        if (settingsDialog != null && settingsDialog.isShowing()) {
+            settingsDialog.toFront();
+            settingsDialog.requestFocus();
+            return;
+        }
+
         JPanel panel = new JPanel(new GridBagLayout()) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -3444,8 +3495,22 @@ public class LauncherGUI extends JFrame {
         JLabel lblRam = settingsLbl("RAM allouée");
         panel.add(lblRam, c);
         c.gridx = 1;
-        JComboBox<String> cRam = new JComboBox<>(new String[]{"2 Go","4 Go","6 Go","8 Go","10 Go","12 Go","14 Go","16 Go"});
-        cRam.setSelectedItem(config.getRamAllocation());
+        String[] ramChoices = buildRamChoices();
+        JComboBox<String> cRam = new JComboBox<>(ramChoices);
+        String configuredRam = config.getRamAllocation();
+        boolean foundConfiguredRam = false;
+        for (String opt : ramChoices) {
+            if (opt.equals(configuredRam)) {
+                foundConfiguredRam = true;
+                break;
+            }
+        }
+        if (!foundConfiguredRam) cRam.addItem(configuredRam);
+        cRam.setSelectedItem(configuredRam);
+        String ramTooltip = "Min 4 Go. Max recommandé: " + detectRecommendedMaxRamGb()
+            + " Go (mémoire système détectée: " + detectTotalSystemRamGb() + " Go).";
+        lblRam.setToolTipText(ramTooltip);
+        cRam.setToolTipText(ramTooltip);
         cRam.setForeground(TEXT);
         cRam.setBorder(BorderFactory.createLineBorder(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80), 1));
         applySettingsComboTheme(cRam);
@@ -3566,13 +3631,46 @@ public class LauncherGUI extends JFrame {
         panel.add(lblChannel, c);
         c.gridx = 1;
 
-        JComboBox<String> cChannel = new JComboBox<>(new String[]{"Stable", "Bêta"});
-        cChannel.setSelectedItem(toChannelLabel(config.getLauncherChannel()));
+        final String betaDisabledLabel = "Bêta (désactivée)";
+        String[] channelChoices = config.isBetaChannelEnabled()
+            ? new String[]{"Stable", "Bêta"}
+            : new String[]{"Stable", betaDisabledLabel};
+
+        JComboBox<String> cChannel = new JComboBox<>(channelChoices);
+        if (config.isBetaChannelEnabled()) cChannel.setSelectedItem(toChannelLabel(config.getLauncherChannel()));
+        else cChannel.setSelectedItem("Stable");
         cChannel.setForeground(TEXT);
         cChannel.setBackground(CARD_BG);
         cChannel.setBorder(BorderFactory.createLineBorder(
             new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 80), 1));
         applySettingsComboTheme(cChannel);
+        if (!config.isBetaChannelEnabled()) {
+            cChannel.setToolTipText("Canal Bêta temporairement désactivé.");
+            cChannel.setRenderer(new DefaultListCellRenderer() {
+                @Override
+                public Component getListCellRendererComponent(JList<?> list, Object value,
+                        int index, boolean isSelected, boolean cellHasFocus) {
+                    JLabel lbl = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                    boolean betaDisabled = betaDisabledLabel.equals(value);
+                    if (betaDisabled) {
+                        lbl.setForeground(TEXT_DIM);
+                        lbl.setBackground(CARD_BG);
+                    } else {
+                        lbl.setForeground(isSelected ? ACCENT : TEXT);
+                        lbl.setBackground(isSelected ? SIDEBAR1 : CARD_BG);
+                    }
+                    lbl.setBorder(new EmptyBorder(4, 10, 4, 10));
+                    return lbl;
+                }
+            });
+            cChannel.addActionListener(e -> {
+                Object selected = cChannel.getSelectedItem();
+                if (betaDisabledLabel.equals(selected)) {
+                    Toolkit.getDefaultToolkit().beep();
+                    cChannel.setSelectedItem("Stable");
+                }
+            });
+        }
         panel.add(cChannel, c);
 
         c.gridx = 0; c.gridy = 1; c.fill = GridBagConstraints.NONE; c.weightx = 0;
@@ -3706,7 +3804,15 @@ public class LauncherGUI extends JFrame {
         backupRow.add(restoreCfgBtn);
         panel.add(backupRow, c);
 
-        JDialog dialog = new JDialog(this, "Paramètres", true);
+        settingsDialog = new JDialog(this, "Paramètres", true);
+        JDialog dialog = settingsDialog;
+        dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        dialog.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosed(java.awt.event.WindowEvent e) {
+                settingsDialog = null;
+            }
+        });
         dialog.setUndecorated(false);
         dialog.setResizable(false);
 
@@ -3931,13 +4037,57 @@ public class LauncherGUI extends JFrame {
     public void appendLog(String message) {
         String safeMessage = (message == null) ? "" : message;
         writeLogLineToFiles(safeMessage);
-        SwingUtilities.invokeLater(() -> {
-            logArea.append(safeMessage + "\n");
+        queueUiLogLine(safeMessage);
+    }
+
+    private void queueUiLogLine(String line) {
+        boolean scheduleFlush = false;
+        synchronized (uiLogLock) {
+            pendingUiLogLines.add(line);
+            if (!uiLogFlushScheduled) {
+                uiLogFlushScheduled = true;
+                scheduleFlush = true;
+            }
+        }
+        if (scheduleFlush) {
+            SwingUtilities.invokeLater(this::flushPendingUiLogs);
+        }
+    }
+
+    private void flushPendingUiLogs() {
+        while (true) {
+            List<String> batch;
+            synchronized (uiLogLock) {
+                if (pendingUiLogLines.isEmpty()) {
+                    uiLogFlushScheduled = false;
+                    return;
+                }
+                batch = new ArrayList<>(pendingUiLogLines);
+                pendingUiLogLines.clear();
+            }
+
+            StringBuilder payload = new StringBuilder(batch.size() * 48);
+            for (String line : batch) {
+                payload.append(line).append('\n');
+            }
+
+            logArea.append(payload.toString());
+            trimUiLogAreaIfNeeded();
             if (logScrollPane != null) {
                 javax.swing.JScrollBar bar = logScrollPane.getVerticalScrollBar();
                 bar.setValue(bar.getMaximum());
             }
-        });
+        }
+    }
+
+    private void trimUiLogAreaIfNeeded() {
+        javax.swing.text.Document doc = logArea.getDocument();
+        int overflow = doc.getLength() - MAX_UI_LOG_CHARS;
+        if (overflow <= 0) return;
+        int toRemove = Math.min(doc.getLength(), overflow + UI_LOG_TRIM_CHARS);
+        try {
+            doc.remove(0, toRemove);
+        } catch (Exception ignored) {}
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -4057,6 +4207,7 @@ public class LauncherGUI extends JFrame {
     private String toChannelKey(String channelLabel) {
         return switch (channelLabel == null ? "" : channelLabel.toLowerCase(Locale.ROOT).trim()) {
             case "bêta", "beta", "béta" -> "beta";
+            case "bêta (désactivée)", "beta (desactivee)", "béta (désactivée)" -> "stable";
             default -> "stable";
         };
     }

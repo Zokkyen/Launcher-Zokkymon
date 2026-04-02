@@ -11,6 +11,9 @@ import java.util.Set;
 
 public class ConfigManager {
 
+    private static final int MIN_RAM_GB = 4;
+    private static final boolean BETA_CHANNEL_ENABLED = false;
+
     /** Chemin fixe du fichier config — toujours dans ~/.zokkymon/config/, indépendant de l'exe */
     private static final String CONFIG_PATH = System.getProperty("user.home")
             + System.getProperty("file.separator") + ".zokkymon"
@@ -106,7 +109,7 @@ public class ConfigManager {
         JSONObject u = new JSONObject();
         u.put("installPath", System.getProperty("user.home")
                 + System.getProperty("file.separator") + ".zokkymon");
-        u.put("ram", "6 Go");
+        u.put("ram", "4 Go");
         u.put("language", "fr");
         u.put("darkMode", true);
         u.put("launcherChannel", inferDefaultChannel());
@@ -178,15 +181,19 @@ public class ConfigManager {
 
     public String getLauncherChannel() {
         String c = userConfig.optString("launcherChannel", "").toLowerCase(Locale.ROOT).trim();
-        if ("beta".equals(c)) return "beta";
+        if ("beta".equals(c) && BETA_CHANNEL_ENABLED) return "beta";
         if ("stable".equals(c) || "main".equals(c)) return "stable";
         return inferDefaultChannel();
     }
 
     public void setLauncherChannel(String channel) {
-        String normalized = "beta".equalsIgnoreCase(channel) ? "beta" : "stable";
+        String normalized = (BETA_CHANNEL_ENABLED && "beta".equalsIgnoreCase(channel)) ? "beta" : "stable";
         userConfig.put("launcherChannel", normalized);
         saveConfig();
+    }
+
+    public boolean isBetaChannelEnabled() {
+        return BETA_CHANNEL_ENABLED;
     }
 
     private String inferDefaultChannel() {
@@ -299,14 +306,26 @@ public class ConfigManager {
     }
 
     public String getRamAllocation() {
-        String ram = userConfig.optString("ram", "6 Go");
+        String ram = userConfig.optString("ram", "4 Go");
         if (ram != null && ram.matches("\\d+Go")) ram = ram.replace("Go", " Go");
-        return ram;
+        return normalizeRamAllocation(ram);
     }
 
     public void setRamAllocation(String ram) {
-        userConfig.put("ram", ram);
+        userConfig.put("ram", normalizeRamAllocation(ram));
         saveConfig();
+    }
+
+    private String normalizeRamAllocation(String ram) {
+        int gb = MIN_RAM_GB;
+        if (ram != null) {
+            try {
+                String numeric = ram.replaceAll("[^0-9]", "").trim();
+                if (!numeric.isBlank()) gb = Integer.parseInt(numeric);
+            } catch (Exception ignored) {}
+        }
+        gb = Math.max(MIN_RAM_GB, gb);
+        return gb + " Go";
     }
 
     public String getLanguage() {
