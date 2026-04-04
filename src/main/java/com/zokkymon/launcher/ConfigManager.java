@@ -12,7 +12,6 @@ import java.util.Set;
 public class ConfigManager {
 
     private static final int MIN_RAM_GB = 4;
-    private static final boolean BETA_CHANNEL_ENABLED = false;
 
     /** Chemin fixe du fichier config — toujours dans ~/.zokkymon/config/, indépendant de l'exe */
     private static final String CONFIG_PATH = System.getProperty("user.home")
@@ -39,9 +38,13 @@ public class ConfigManager {
     /** Config utilisateur — préférences et données propres à la machine. */
     private JSONObject userConfig;
 
+    /** Etat runtime du canal beta, désactivé par défaut mais surchargeable au besoin. */
+    private boolean betaChannelEnabled;
+
     @SuppressWarnings("this-escape")
     public ConfigManager() {
         loadJarConfig();
+        betaChannelEnabled = resolveBetaChannelEnabled();
         loadUserConfig();
     }
 
@@ -181,23 +184,32 @@ public class ConfigManager {
 
     public String getLauncherChannel() {
         String c = userConfig.optString("launcherChannel", "").toLowerCase(Locale.ROOT).trim();
-        if ("beta".equals(c) && BETA_CHANNEL_ENABLED) return "beta";
+        if ("beta".equals(c) && betaChannelEnabled) return "beta";
         if ("stable".equals(c) || "main".equals(c)) return "stable";
         return inferDefaultChannel();
     }
 
     public void setLauncherChannel(String channel) {
-        String normalized = (BETA_CHANNEL_ENABLED && "beta".equalsIgnoreCase(channel)) ? "beta" : "stable";
+        String normalized = (betaChannelEnabled && "beta".equalsIgnoreCase(channel)) ? "beta" : "stable";
         userConfig.put("launcherChannel", normalized);
         saveConfig();
     }
 
     public boolean isBetaChannelEnabled() {
-        return BETA_CHANNEL_ENABLED;
+        return betaChannelEnabled;
     }
 
     private String inferDefaultChannel() {
         return "stable";
+    }
+
+    private boolean resolveBetaChannelEnabled() {
+        String envOverride = System.getenv("ZOKKYMON_BETA_CHANNEL_ENABLED");
+        if (envOverride != null && !envOverride.isBlank()) {
+            return Boolean.parseBoolean(envOverride.trim());
+        }
+
+        return jarConfig.optBoolean("betaChannelEnabled", false);
     }
 
     private String mapLauncherInfoUrlForChannel(String originalUrl, String channel) {
