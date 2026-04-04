@@ -1,4 +1,4 @@
-## 🧪 Notes beta 0.4.1
+## 🧪 Notes beta 0.4.2
 
 - Nouveautés launcher :
 	- Prise en charge de Fabric Loader 0.18.4.
@@ -6,7 +6,9 @@
 	- Recherche en direct des mods.
 	- Tri des mods par nom, version, taille et date.
 	- Filtre de compatibilité Tous / OK / A vérifier.
-	- Export du catalogue des mods en CSV et JSON.
+	- Nouvelle colonne Environnement dans le catalogue (Client / Serveur / Client/Serveur).
+	- Filtre Environnement: Tous / Client / Serveur / Client/Serveur.
+	- Export du catalogue des mods en CSV et JSON (avec le champ environment).
 
 - Améliorations offline/local :
 	- Lancement local autorisé si le serveur est hors ligne et qu'un modpack local est présent.
@@ -14,13 +16,33 @@
 	- La carte serveur affiche maintenant Mod local disponible ou Mod local indisponible.
 
 - Correctifs techniques :
+	- RAM minimale imposée à 4 Go (la valeur 2 Go n'est plus proposée).
+	- Au premier lancement, la RAM par défaut est fixée à 4 Go.
+	- La liste RAM des paramètres est désormais dynamique selon la mémoire système détectée (max recommandé = mémoire système - 4 Go).
+	- Correction du preset RAM/JVM: les réglages manuels basculent automatiquement vers le profil custom pour éviter l'écrasement des valeurs choisies.
 	- Vérification SHA Fabric assouplie en mode local si le checksum distant est indisponible.
 	- Correction du problème de signature de méthode autour de la vérification SHA des artefacts.
 	- Résolution plus robuste du dossier modpack local courant.
+	- Correction d'un argument JVM FabricMcEmu mal formé.
+	- Fiabilisation de l'injection des mods launcher: réinjection automatique si un mod injecté manque malgré le cache.
+	- Ouverture des dialogues sécurisée: une seule fenêtre Paramètres et une seule fenêtre Console peuvent être ouvertes simultanément.
+	- Optimisation de l'affichage console UI: agrégation des lignes + purge automatique des anciennes entrées pour éviter les ralentissements après une longue session.
+
+- Sécurité :
+	- Les tokens Microsoft ne sont plus écrits en clair en cas d'échec du chiffrement local.
+	- Durcissement des connexions réseau de l'updater: HTTPS requis (sauf loopback local).
+
+- Canal de mise à jour :
+	- Le canal Bêta est temporairement désactivé côté interface (option grisée/indisponible) pour éviter la bascule utilisateur prématurée.
 
 ## ⚠️ À tester
 
 - Vérifier le parcours complet serveur hors ligne + modpack local présent.
 - Vérifier le comportement serveur hors ligne + aucun modpack local.
-- Vérifier le catalogue mods sur un pack volumineux (recherche, tri, filtre, export).
+- Vérifier le catalogue mods sur un pack volumineux (recherche, tri, filtres compatibilité/environnement, export CSV/JSON).
+- Vérifier les mods sans champ environment dans fabric.mod.json (attendu: Client/Serveur).
+- Vérifier qu'une suppression manuelle d'un mod injecté est bien réparée au lancement suivant.
 - Vérifier la compatibilité du pack complet avec Fabric 0.18.4.
+- Vérifier que le dialogue Paramètres reste en instance unique (pas de blocage ni double ouverture).
+- Vérifier que le dialogue Console reste en instance unique.
+- Vérifier la fluidité d'ouverture de la console après une session longue.

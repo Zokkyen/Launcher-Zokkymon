@@ -259,7 +259,7 @@ public class Launcher {
             // ── Encodage + Fabric ────────────────────────────────────────────
             "-Dfile.encoding=UTF-8",
             "-Dfabric.development=false",
-            "-DFabricMcEmu= net.minecraft.client.main.Main",
+            "-DFabricMcEmu=net.minecraft.client.main.Main",
             "-Dwaila.allowUnsupportedPlatforms=true",
             "-Djava.library.path=" + new File(gameDirFile, "natives").getAbsolutePath(),
             "-cp", classpath,
@@ -2147,9 +2147,12 @@ public class Launcher {
         File cacheFile = new File(gameDirFile, ".launcher_mods_fingerprint");
         String currentFingerprint = computeModsFingerprint(launcherModsDir);
         String previousFingerprint = readSmallTextFile(cacheFile);
-        if (currentFingerprint.equals(previousFingerprint)) {
+        if (currentFingerprint.equals(previousFingerprint) && areInjectedLauncherModsPresent(jars, gameMods)) {
             gui.appendLog("[Mods] Injection inchangée (cache). ");
             return;
+        }
+        if (currentFingerprint.equals(previousFingerprint)) {
+            gui.appendLog("[Mods] Cache inchangé mais mods manquants détectés: réinjection.");
         }
 
         for (File src : jars) {
@@ -2170,6 +2173,17 @@ public class Launcher {
         }
 
         writeSmallTextFile(cacheFile, currentFingerprint);
+    }
+
+    private static boolean areInjectedLauncherModsPresent(File[] launcherJars, File gameMods) {
+        if (launcherJars == null || launcherJars.length == 0) return true;
+        for (File src : launcherJars) {
+            File dest = new File(gameMods, src.getName());
+            if (!dest.exists() || dest.length() != src.length()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static List<String> parseJvmArgs(String raw) {
