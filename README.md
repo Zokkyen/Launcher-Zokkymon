@@ -2,6 +2,12 @@
   <img src="launcher.png" alt="Zokkymon Banner" width="800"/>
 </p>
 
+<p align="center">
+  <a href="https://ko-fi.com/W7W81XDRHP">
+    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support me on Ko-fi"/>
+  </a>
+</p>
+
 <h1 align="center">Launcher Zokkymon</h1>
 
 <p align="center">
