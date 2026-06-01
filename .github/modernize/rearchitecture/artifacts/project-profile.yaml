@@ -1,0 +1,44 @@
+project:
+  scope_path: "."
+  loc: 8590
+  languages: [java, xml, powershell, batch, gradle, json, markdown]
+  git: true
+  structure:
+    src: "Application launcher Java principale"
+    splash-mod: "Sous-module Fabric annexe pour le splash"
+    config: "Configuration packagée et ressources de build"
+    release-notes: "Notes de version et documentation de release"
+  notes: "Launcher Java Zokkymon avec intégration Discord Rich Presence et lancement Minecraft Fabric."
+
+assessment:
+  change_type: upgrade
+  rationale: |
+    Changement brownfield en place, ciblé sur le comportement Discord d'un launcher Java existant,
+    sans extraction de module ni réécriture cross-stack.
+  transformations:
+    - fromStack: "Java launcher with Discord Rich Presence"
+      fromStackVersion: "current"
+      toStack: "Java launcher with adjusted Discord labeling"
+      toStackVersion: "current"
+  grouping_needed: false
+  deep_planning: false
+
+progress_sync:
+  run_id: "ef9f4a0b-f7cb-43a0-a143-fc9630671b92"
+  grouping_mode: "none"
+  execution_mode: "all-at-once"
+  plan_start_time: "2026-06-01T22:19:23Z"
+  plan_completed_time: "2026-06-01T22:19:23Z"
+  execution_start_time: "2026-06-01T22:19:23Z"
+  execution_completed_time: ""
+  validation_start_time: ""
+  validation_completed_time: ""
+  total_phases: 3
+  completed_phases: 0
+  total_modules: 2
+  completed_modules: 0
+  total_tasks: 4
+  completed_tasks: 0
+  total_commits: 198
+  build_verified: false
+  test_verified: false

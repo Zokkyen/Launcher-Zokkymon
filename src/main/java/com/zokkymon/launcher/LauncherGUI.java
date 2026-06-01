@@ -123,6 +123,7 @@ public class LauncherGUI extends JFrame {
     private volatile String  cachedInfoRam        = null;
     private volatile String  cachedInfoMods       = null;
     private volatile String  cachedInfoDisk       = null;
+    private volatile boolean discordSessionInProgress = false;
 
     // ── Polices statiques ─────────────────────────────────────────────────────
     private static final Font FONT_MONO  = new Font("Consolas", Font.PLAIN,  12);
@@ -166,6 +167,7 @@ public class LauncherGUI extends JFrame {
 
         config  = new ConfigManager();
         MicrosoftAuth.setClientId(config.getClientId());
+        DiscordPresenceService.initialize(config);
         applyTheme(config.isDarkMode());
         updater = new Updater(this, config);
         initLogStorage();
@@ -184,7 +186,13 @@ public class LauncherGUI extends JFrame {
 
         JPanel root = buildRootPanel();
         setContentPane(root);
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override public void windowClosing(java.awt.event.WindowEvent e) {
+                DiscordPresenceService.shutdown();
+            }
+        });
         setVisible(true);
+        refreshDiscordLauncherPresence(true);
 
         startBackgroundChecks();
         new Thread(this::checkAndUpdate).start();
@@ -1044,6 +1052,7 @@ public class LauncherGUI extends JFrame {
         serverModeLbl.setToolTipText(localAvailable
             ? "Un modpack est détecté localement et peut être lancé hors ligne."
             : "Aucun modpack local détecté sur cette machine.");
+        refreshDiscordLauncherPresence(false);
     }
 
     private void setReadyToPlayButtonState() {
@@ -3387,12 +3396,22 @@ public class LauncherGUI extends JFrame {
     private void doLaunchGame() {
         playButton.setEnabled(false);
         setStatus("Pré-vérification...");
+        discordSessionInProgress = true;
+        DiscordPresenceService.setPreparingLaunch(
+            config.getModpackName(),
+            resolveDiscordModpackVersion(),
+            config.getMinecraftVersion(),
+            resolveDiscordPresencePlayer(),
+            resolveDiscordServerState()
+        );
         appendLog(">> Démarrage du processus de pré-vérification...");
         long t0 = System.currentTimeMillis();
         new Thread(() -> {
             try {
                 if (!runPreLaunchHealthCheck()) {
                     setStatus("Lancement annulé");
+                    discordSessionInProgress = false;
+                    refreshDiscordLauncherPresence(true);
                     SwingUtilities.invokeLater(() -> {
                         playButton.setText("RÉPARER");
                         playButton.setBackground(WARNING);
@@ -3431,6 +3450,8 @@ public class LauncherGUI extends JFrame {
                 if (gameDir == null) {
                     setStatus("Modpack introuvable");
                     appendLog("[ERR] Dossier modpack non trouvé dans " + config.getInstallPath());
+                    discordSessionInProgress = false;
+                    refreshDiscordLauncherPresence(true);
                     SwingUtilities.invokeLater(() -> playButton.setEnabled(true));
                     return;
                 }
@@ -3441,13 +3462,24 @@ public class LauncherGUI extends JFrame {
 
                 if (!updater.installFabricLoader(gameDir.getAbsolutePath())) {
                     setStatus("Erreur d'installation");
+                    discordSessionInProgress = false;
+                    refreshDiscordLauncherPresence(true);
                     SwingUtilities.invokeLater(() -> playButton.setEnabled(true));
                     return;
                 }
+                DiscordPresenceService.setPlaying(
+                    config.getModpackName(),
+                    resolveDiscordModpackVersion(),
+                    config.getMinecraftVersion(),
+                    resolveDiscordPresencePlayer(),
+                    resolveDiscordServerState()
+                );
                 Launcher.launchMinecraft(config, this, gameDir.getAbsolutePath());
                 long elapsed = (System.currentTimeMillis() - t0) / 1000;
                 appendLog(">> Session terminée en " + elapsed + "s.");
                 setStatus("Session terminée");
+                discordSessionInProgress = false;
+                refreshDiscordLauncherPresence(true);
                 SwingUtilities.invokeLater(() -> {
                     playButton.setBackground(ACCENT);
                     playButton.setEnabled(true);
@@ -3455,6 +3487,8 @@ public class LauncherGUI extends JFrame {
             } catch (Exception e) {
                 setStatus("Échec du lancement");
                 appendLog("ERREUR CRITIQUE : " + e.getMessage());
+                discordSessionInProgress = false;
+                refreshDiscordLauncherPresence(true);
                 SwingUtilities.invokeLater(() -> {
                     playButton.setText("RÉPARER");
                     playButton.setBackground(WARNING);
@@ -3462,6 +3496,36 @@ public class LauncherGUI extends JFrame {
                 });
             }
         }).start();
+    }
+
+    private void refreshDiscordLauncherPresence(boolean force) {
+        if (!force && discordSessionInProgress) return;
+        DiscordPresenceService.setLauncherPresence(
+            config.getModpackName(),
+            resolveDiscordModpackVersion(),
+            config.getMinecraftVersion(),
+            config.getLauncherVersion(),
+            resolveDiscordServerState(),
+            resolveCurrentInstalledModpackDir() != null
+        );
+    }
+
+    private String resolveDiscordModpackVersion() {
+        String version = config.getModpackVersion();
+        return version == null ? "" : version.strip();
+    }
+
+    private String resolveDiscordServerState() {
+        if (cachedServerOnline == null) return "Serveur: vérification";
+        return cachedServerOnline ? "Serveur en ligne" : "Serveur hors ligne";
+    }
+
+    private String resolveDiscordPresencePlayer() {
+        String player = config.hasMsaProfile() ? config.getMsaUsername() : "";
+        if (player == null || player.isBlank()) {
+            return "Mode hors ligne";
+        }
+        return "Joueur: " + player.strip();
     }
 
     private void openSettings() {
