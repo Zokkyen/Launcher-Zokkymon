@@ -12,5 +12,10 @@
   "modpackToken": "VOTRE_TOKEN_MODPACK",
   "ram": "8 Go",
   "modpackVersion": "",
-  "msaClientId": "VOTRE_AZURE_CLIENT_ID"
+  "msaClientId": "VOTRE_AZURE_CLIENT_ID",
+  "discordApplicationId": "VOTRE_DISCORD_APPLICATION_ID",
+  "discordLargeImageKey": "minecraft",
+  "discordLargeImageText": "Minecraft",
+  "discordSmallImageKey": "zokkymon",
+  "discordSmallImageText": "Nom du launcher"
 }
