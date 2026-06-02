@@ -26,7 +26,9 @@ public class ConfigManager {
     private static final Set<String> JAR_KEYS = Set.of(
         "launcherVersion", "launcherInfoUrl", "modpackInfoUrl", "serverUrl",
         "modpackName", "fabricVersion", "minecraftVersion", "enableVersionCheck",
-        "msaClientId", "launcherExeName"
+        "msaClientId", "launcherExeName", "discordApplicationId",
+        "discordLargeImageKey", "discordLargeImageText",
+        "discordSmallImageKey", "discordSmallImageText"
     );
 
     /** Clés obsolètes retirées du fichier utilisateur au premier chargement. */
@@ -151,26 +153,29 @@ public class ConfigManager {
     public boolean isVersionCheckEnabled() { return jarConfig.optBoolean("enableVersionCheck", true); }
 
     public String getClientId() {
-        String embedded = jarConfig.optString("msaClientId", "").strip();
-        if (!embedded.isBlank()) return embedded;
+        return resolveEmbeddedConfigValue("msaClientId", "ZOKKYMON_MSA_CLIENT_ID");
+    }
 
-        // Fallback 1: variable d'environnement pour dépannage rapide sans rebuild.
-        String env = System.getenv("ZOKKYMON_MSA_CLIENT_ID");
-        if (env != null && !env.isBlank()) return env.strip();
+    public String getDiscordApplicationId() {
+        return resolveEmbeddedConfigValue("discordApplicationId", "ZOKKYMON_DISCORD_APPLICATION_ID");
+    }
 
-        // Fallback 2: fichier config externe (utile si la config embarquée est vide).
-        try {
-            Path externalConfig = Paths.get("config", "launcher_config.json");
-            if (Files.exists(externalConfig)) {
-                JSONObject ext = new JSONObject(new String(Files.readAllBytes(externalConfig)));
-                String extId = ext.optString("msaClientId", "").strip();
-                if (!extId.isBlank()) return extId;
-            }
-        } catch (Exception ignored) {
-            // On reste non-bloquant: le launcher continuera à signaler l'absence de client ID.
-        }
+    public String getDiscordLargeImageKey() {
+        return resolveEmbeddedConfigValue("discordLargeImageKey", "ZOKKYMON_DISCORD_LARGE_IMAGE_KEY");
+    }
 
-        return "";
+    public String getDiscordLargeImageText() {
+        String text = resolveEmbeddedConfigValue("discordLargeImageText", "ZOKKYMON_DISCORD_LARGE_IMAGE_TEXT");
+        return text.isBlank() ? getModpackName() : text;
+    }
+
+    public String getDiscordSmallImageKey() {
+        return resolveEmbeddedConfigValue("discordSmallImageKey", "ZOKKYMON_DISCORD_SMALL_IMAGE_KEY");
+    }
+
+    public String getDiscordSmallImageText() {
+        String text = resolveEmbeddedConfigValue("discordSmallImageText", "ZOKKYMON_DISCORD_SMALL_IMAGE_TEXT");
+        return text.isBlank() ? getLauncherExeName() : text;
     }
 
     public String getLauncherInfoUrl() {
@@ -245,6 +250,27 @@ public class ConfigManager {
         } catch (Exception ignored) {
             return originalUrl;
         }
+    }
+
+    private String resolveEmbeddedConfigValue(String key, String envKey) {
+        String embedded = jarConfig.optString(key, "").strip();
+        if (!embedded.isBlank()) return embedded;
+
+        String env = System.getenv(envKey);
+        if (env != null && !env.isBlank()) return env.strip();
+
+        try {
+            Path externalConfig = Paths.get("config", "launcher_config.json");
+            if (Files.exists(externalConfig)) {
+                JSONObject ext = new JSONObject(new String(Files.readAllBytes(externalConfig)));
+                String extValue = ext.optString(key, "").strip();
+                if (!extValue.isBlank()) return extValue;
+            }
+        } catch (Exception ignored) {
+            // On reste non-bloquant: le launcher continuera à fonctionner sans cette clé.
+        }
+
+        return "";
     }
 
     public void setLauncherVersion(String version) {

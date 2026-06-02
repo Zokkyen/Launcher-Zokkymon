@@ -12,6 +12,17 @@
   <name>Zokkymon Launcher</name>
   <description>Launcher for Zokkymon modpack</description>
 
+  <repositories>
+    <repository>
+      <id>jitpack.io</id>
+      <url>https://jitpack.io</url>
+    </repository>
+    <repository>
+      <id>scijava.public</id>
+      <url>https://maven.scijava.org/content/groups/public</url>
+    </repository>
+  </repositories>
+
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>21</maven.compiler.release>
@@ -40,6 +51,12 @@
       <groupId>com.formdev</groupId>
       <artifactId>flatlaf</artifactId>
       <version>3.5.4</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.github.MinnDevelopment</groupId>
+      <artifactId>java-discord-rpc</artifactId>
+      <version>v2.0.1</version>
     </dependency>
   </dependencies>
 
